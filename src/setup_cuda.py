@@ -37,7 +37,7 @@ else:
     ])
     # Step 2: Install remaining packages
     packages = [
-        "customtkinter", "opencv-python", "pyserial", "mss", "ultralytics",
+        "customtkinter", "opencv-python", "pyserial", "mss", "ultralytics==8.3.187",
         "tensorrt==10.11.0.33", "onnx", "onnxruntime-directml", "cyndilib", "dxcam"
     ]
     print(f"[*] {REQUIREMENTS} not found. Installing default packages: {packages}")
