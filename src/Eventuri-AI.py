@@ -889,6 +889,10 @@ class CapkfaPlusGUI(ctk.CTk):
             pass
         self._set_entry_text(self.offset_entry, str(config.player_y_offset))
 
+    def on_rcs_toggle(self):
+        config.rcs_enabled = bool(self.rcs_enabled_var.get())
+        config.save()
+
     def on_rcs_y_entry_commit(self, event=None):
         try:
             val = float(self.rcs_y_entry.get().strip())
