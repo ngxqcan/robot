@@ -2,7 +2,7 @@ import os
 import customtkinter as ctk
 from tkinter import messagebox
 from config import config
-from mouse import Mouse,connect_to_makcu, test_move
+from mouse import Mouse, connect_to_logitech, connect_to_makcu, test_move
 import main
 from main import (
     start_aimbot, stop_aimbot, is_aimbot_running,
@@ -19,7 +19,7 @@ ctk.set_appearance_mode("dark")
 class EventuriGUI(ctk.CTk, GUISections, GUICallbacks):
     def __init__(self):
         super().__init__()
-        self.title("EVENTURI-AI for MAKCU")
+        self.title("EVENTURI-AI (1PC Logitech Driver)")
         
         # Get screen dimensions for responsive design
         screen_width = self.winfo_screenwidth()
@@ -143,7 +143,7 @@ class EventuriGUI(ctk.CTk, GUISections, GUICallbacks):
         conn_text_frame.grid(row=0, column=1)
         ctk.CTkLabel(
             conn_text_frame, 
-            text="MAKCU Device", 
+            text="Logitech Driver", 
             font=("Segoe UI", 12, "bold"),
             text_color="#ccc"
         ).grid(row=0, column=0, sticky="w")
@@ -235,15 +235,15 @@ class EventuriGUI(ctk.CTk, GUISections, GUICallbacks):
         self.build_main_controls(self.right_column, row)
 
     def build_device_controls(self, parent, row):
-        """MAKCU device controls (top section)"""
+        """Logitech device controls (top section)"""
         frame = ctk.CTkFrame(parent, fg_color="#1a1a1a")
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
         frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(frame, text="🔌 Device Controls", font=("Segoe UI", 16, "bold"),
+        ctk.CTkLabel(frame, text="🔌 Driver Controls (1PC)", font=("Segoe UI", 16, "bold"),
                     text_color="#00e676").grid(row=0, column=0, columnspan=3, pady=(15, 10), padx=15, sticky="w")
 
-        self.connect_btn = neon_button(frame, text="Connect to MAKCU", command=self.on_connect, width=150, height=35)
+        self.connect_btn = neon_button(frame, text="Connect Driver", command=self.on_connect, width=150, height=35)
         self.connect_btn.grid(row=1, column=0, padx=15, pady=(0, 15), sticky="w")
 
         ctk.CTkButton(frame, text="Test Move", command=test_move, width=100, height=35,
@@ -281,7 +281,7 @@ class EventuriGUI(ctk.CTk, GUISections, GUICallbacks):
             .grid(row=1, column=0, sticky="w", padx=15)
         self.capture_mode_var = ctk.StringVar(value=config.capturer_mode.upper())
         self.capture_mode_menu = ctk.CTkOptionMenu(
-            frame, values=["MSS", "NDI", "DXGI"], variable=self.capture_mode_var,
+            frame, values=["DXGI", "MSS", "NDI"], variable=self.capture_mode_var,
             command=self.on_capture_mode_change, width=110
         )
         self.capture_mode_menu.grid(row=1, column=1, sticky="w", padx=(5, 15), pady=10)
@@ -812,7 +812,7 @@ class EventuriGUI(ctk.CTk, GUISections, GUICallbacks):
         
         ctk.CTkLabel(
             footer,
-            text="Made with ♥ by Ahmo934 and Jealousyhaha for Makcu Community",
+            text="Eventuri AI (1PC Logitech Driver)",
             font=("Segoe UI", 12, "bold"),
             text_color=NEON
         ).pack(expand=True)
@@ -866,26 +866,31 @@ class EventuriGUI(ctk.CTk, GUISections, GUICallbacks):
     def on_connect(self):
         """Enhanced connection with visual feedback"""
         Mouse.cleanup()  # Ensure mouse is clean before connecting
-        if connect_to_makcu():
+        if connect_to_logitech():
+            config.logitech_connected = True
+            config.logitech_status_msg = "Connected"
             config.makcu_connected = True
             config.makcu_status_msg = "Connected"
             self.connection_status.set("Connected")
             self.connection_color.set("#00FF00")
             self.conn_indicator.configure(fg_color="#00FF00")
-            self.error_text.set("✅ MAKCU device connected successfully!")
+            self.error_text.set("✅ Logitech driver connected successfully!")
         else:
+            config.logitech_connected = False
+            config.logitech_status_msg = "Disconnected"
             config.makcu_connected = False
-            config.makcu_status_msg = "Connection Failed"
+            config.makcu_status_msg = "Disconnected"
             self.connection_status.set("Disconnected")
             self.connection_color.set("#b71c1c")
             self.conn_indicator.configure(fg_color="#b71c1c")
-            self.error_text.set("❌ Failed to connect to MAKCU device")
+            self.error_text.set("❌ Failed to load logitech.driver.dll!")
         
         self.conn_status_lbl.configure(text_color=self.connection_color.get())
 
     def _poll_connection_status(self):
         """Enhanced status polling with visual updates"""
-        if config.makcu_connected:
+        driver_ok = getattr(config, "logitech_connected", False) or getattr(config, "makcu_connected", False)
+        if driver_ok:
             self.connection_status.set("Connected")
             self.connection_color.set("#00FF00")
             self.conn_indicator.configure(fg_color="#00FF00")

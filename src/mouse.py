@@ -1,309 +1,241 @@
-import threading
-import serial
-from serial.tools import list_ports
+import os
+import sys
 import time
+import ctypes
+import threading
 
-makcu = None
-makcu_lock = threading.Lock()
+# Global state
+driver = None
+driver_lock = threading.Lock()
+is_connected = False
 button_states = {i: False for i in range(5)}
 button_states_lock = threading.Lock()
-is_connected = False
-last_value = 0
+_listener_running = False
+_listener_thread = None
 
-SUPPORTED_DEVICES = [
-    ("1A86:55D3", "MAKCU"),
-    ("1A86:5523", "CH343"),
-    ("1A86:7523", "CH340"),
-    ("1A86:5740", "CH347"),
-    ("10C4:EA60", "CP2102"),
-]
-BAUD_RATES = [4_000_000, 2_000_000, 115_200]
-BAUD_CHANGE_COMMAND = bytearray([0xDE, 0xAD, 0x05, 0x00, 0xA5, 0x00, 0x09, 0x3D, 0x00])
+# Backward compatibility alias
+makcu = None
+makcu_lock = driver_lock
 
-def find_com_ports():
-    found = []
-    for port in list_ports.comports():
-        hwid = port.hwid.upper()
-        desc = port.description.upper()
-        for vidpid, name in SUPPORTED_DEVICES:
-            if vidpid in hwid or name.upper() in desc:
-                found.append((port.device, name))
-                break
-    return found
+# Virtual Key Mapping for 1PC mouse button detection
+# 0: Left, 1: Right, 2: Middle, 3: Side 4 (XBUTTON1), 4: Side 5 (XBUTTON2)
+VK_MOUSE_MAP = {
+    0: 0x01,  # VK_LBUTTON
+    1: 0x02,  # VK_RBUTTON
+    2: 0x04,  # VK_MBUTTON
+    3: 0x05,  # VK_XBUTTON1
+    4: 0x06,  # VK_XBUTTON2
+}
 
-def km_version_ok(ser):
+# Function pointers from logitech.driver.dll
+_device_open_fn = None
+_moveR_fn = None
+_mouse_down_fn = None
+_mouse_up_fn = None
+_click_fn = None
+_device_close_fn = None
+
+
+def find_driver_dll():
+    """Locate logitech.driver.dll across common directories."""
+    candidates = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "logitech.driver.dll"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logitech.driver.dll"),
+        os.path.join(os.getcwd(), "logitech.driver.dll"),
+        os.path.join(os.getcwd(), "src", "logitech.driver.dll"),
+        os.path.join(os.getcwd(), "driver", "logitech.driver.dll"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "driver", "logitech.driver.dll"),
+        "logitech.driver.dll",
+    ]
+    for p in candidates:
+        norm_path = os.path.abspath(p)
+        if os.path.isfile(norm_path):
+            return norm_path
+    return "logitech.driver.dll"
+
+
+def connect_to_logitech():
+    """
+    Load logitech.driver.dll and initialize Logitech driver connection for 1PC.
+    """
+    global driver, is_connected, makcu
+    global _device_open_fn, _moveR_fn, _mouse_down_fn, _mouse_up_fn, _click_fn, _device_close_fn
+    global _listener_running, _listener_thread
+
+    dll_path = find_driver_dll()
+    print(f"[INFO] Looking for Logitech driver DLL at: {dll_path}")
+
     try:
-        ser.reset_input_buffer()
-        ser.write(b"km.version()\r")
-        ser.flush()
-        time.sleep(0.1)
-        resp = b""
-        start = time.time()
-        while time.time() - start < 0.3:
-            if ser.in_waiting:
-                resp += ser.read(ser.in_waiting)
-                if b"km.MAKCU" in resp or b"MAKCU" in resp:
-                    return True
-            time.sleep(0.01)
-        return False
-    except Exception as e:
-        print(f"[WARN] km_version_ok: {e}")
-        return False
-
-def connect_to_makcu():
-    global makcu, is_connected
-    ports = find_com_ports()
-    if not ports:
-        print("[ERROR] No supported serial devices found.")
-        return False
-
-    for port_name, dev_name in ports:
-        if dev_name == "MAKCU":
-            for baud in BAUD_RATES:
-                print(f"[INFO] Probing MAKCU {port_name} @ {baud} with km.version()...")
-                ser = None
-                try:
-                    ser = serial.Serial(port_name, baud, timeout=0.3)
-                    time.sleep(0.1)
-                    if km_version_ok(ser):
-                        if baud == 115_200:
-                            print("[INFO] MAKCU responded at 115200, sending 4M handshake...")
-                            ser.write(BAUD_CHANGE_COMMAND)
-                            ser.flush()
-                            ser.close()
-                            time.sleep(0.15)
-                            # --- Always cleanup before opening new connection! ---
-                            ser4m = None
-                            try:
-                                ser4m = serial.Serial(port_name, 4_000_000, timeout=0.3)
-                                time.sleep(0.1)
-                                if km_version_ok(ser4m):
-                                    print(f"[INFO] MAKCU handshake successful, switching to 4M on {port_name}.")
-                                    ser4m.close()
-                                    time.sleep(0.1)
-                                    makcu = serial.Serial(port_name, 4_000_000, timeout=0.1)
-                                    with makcu_lock:
-                                        makcu.write(b"km.buttons(1)\r")
-                                        makcu.flush()
-                                    is_connected = True
-                                    return True
-                                else:
-                                    print("[WARN] 4M handshake failed, staying at 115200.")
-                                    ser4m.close()
-                                    time.sleep(0.1)
-                                    makcu = serial.Serial(port_name, 115_200, timeout=0.1)
-                                    with makcu_lock:
-                                        makcu.write(b"km.buttons(1)\r")
-                                        makcu.flush()
-                                    is_connected = True
-                                    return True
-                            except Exception as e:
-                                print(f"[WARN] Could not switch to 4M: {e}")
-                                if ser4m:
-                                    try:
-                                        ser4m.close()
-                                    except:
-                                        pass
-                                time.sleep(0.1)
-                                makcu = serial.Serial(port_name, 115_200, timeout=0.1)
-                                with makcu_lock:
-                                    makcu.write(b"km.buttons(1)\r")
-                                    makcu.flush()
-                                is_connected = True
-                                return True
-                        else:
-                            print(f"[INFO] MAKCU responded at {baud}, using it.")
-                            ser.close()
-                            time.sleep(0.1)
-                            makcu = serial.Serial(port_name, baud, timeout=0.1)
-                            with makcu_lock:
-                                makcu.write(b"km.buttons(1)\r")
-                                makcu.flush()
-                            is_connected = True
-                            return True
-                    ser.close()
-                    time.sleep(0.1)
-                except Exception as e:
-                    print(f"[WARN] Failed MAKCU@{baud}: {e}")
-                    if ser:
-                        try:
-                            ser.close()
-                        except:
-                            pass
-                        time.sleep(0.1)
-                    if makcu and makcu.is_open:
-                        makcu.close()
-                    makcu = None
-                    is_connected = False
+        if os.name == "nt":
+            loaded_dll = ctypes.CDLL(dll_path)
         else:
-            for baud in BAUD_RATES:
-                print(f"[INFO] Trying {dev_name} {port_name} @ {baud} ...")
-                ser = None
-                try:
-                    ser = serial.Serial(port_name, baud, timeout=0.1)
-                    with makcu_lock:
-                        ser.write(b"km.buttons(1)\r")
-                        ser.flush()
-                    ser.close()
-                    time.sleep(0.1)
-                    makcu = serial.Serial(port_name, baud, timeout=0.1)
-                    is_connected = True
-                    print(f"[INFO] Connected to {dev_name} on {port_name} at {baud} baud.")
-                    return True
-                except Exception as e:
-                    print(f"[WARN] Failed {dev_name}@{baud}: {e}")
-                    if ser:
-                        try:
-                            ser.close()
-                        except:
-                            pass
-                        time.sleep(0.1)
-                    if makcu and makcu.is_open:
-                        makcu.close()
-                    makcu = None
-                    is_connected = False
+            # Fallback for testing on non-Windows
+            try:
+                loaded_dll = ctypes.CDLL(dll_path)
+            except Exception:
+                print(f"[WARN] Non-Windows OS detected or DLL missing: {dll_path}")
+                loaded_dll = None
+    except Exception as e:
+        print(f"[ERROR] Could not load Logitech driver DLL '{dll_path}': {e}")
+        is_connected = False
+        driver = None
+        makcu = None
+        return False
 
-    print("[ERROR] Could not connect to any supported device.")
-    return False
+    if loaded_dll is None:
+        is_connected = False
+        driver = None
+        makcu = None
+        return False
 
+    driver = loaded_dll
+    makcu = driver
 
-def count_bits(n: int) -> int:
-    return bin(n).count("1")
-
-def listen_makcu():
-    global last_value
-    # start from a clean state
-    last_value = 0
-    with button_states_lock:
-        for i in range(5):
-            button_states[i] = False
-
-    while is_connected:
-        try:
-            b = makcu.read(1)  # blocking read (uses port timeout)
-            if not b:
-                continue
-
-            v = b[0]
-
-            # Ignore echoed ASCII (including CR/LF). Only 0..31 are valid masks.
-            if v in (0x0A, 0x0D) or v > 31:
-                continue
-
-            # v is a 5-bit mask (bit0..bit4). Update only changed bits.
-            changed = last_value ^ v
-            if changed:
-                with button_states_lock:
-                    for i in range(5):
-                        m = 1 << i
-                        if changed & m:
-                            button_states[i] = bool(v & m)
-                last_value = v
-
-        except serial.SerialException as e:
-            print(f"[ERROR] Listener serial exception: {e}")
+    # 1. Resolve device_open / init
+    _device_open_fn = None
+    for name in ["device_open", "device_initialize", "initialize", "init", "Init", "Open", "device_open_lghub"]:
+        if hasattr(driver, name):
+            _device_open_fn = getattr(driver, name)
+            try:
+                _device_open_fn.restype = ctypes.c_int
+            except Exception:
+                pass
             break
-        except Exception as e:
-            # swallow transient errors but keep running
-            print(f"[WARN] Listener error: {e}")
-            time.sleep(0.001)
 
-    # ensure clean state on exit
-    with button_states_lock:
-        for i in range(5):
-            button_states[i] = False
-    last_value = 0
+    # 2. Resolve moveR / move
+    _moveR_fn = None
+    for name in ["moveR", "move", "mouse_move", "move_relative", "MoveR", "Move"]:
+        if hasattr(driver, name):
+            _moveR_fn = getattr(driver, name)
+            try:
+                _moveR_fn.argtypes = [ctypes.c_int, ctypes.c_int]
+                _moveR_fn.restype = ctypes.c_int
+            except Exception:
+                pass
+            break
+
+    # 3. Resolve mouse_down
+    _mouse_down_fn = None
+    for name in ["mouse_down", "MouseDown", "mouse_press"]:
+        if hasattr(driver, name):
+            _mouse_down_fn = getattr(driver, name)
+            try:
+                _mouse_down_fn.argtypes = [ctypes.c_int]
+            except Exception:
+                pass
+            break
+
+    # 4. Resolve mouse_up
+    _mouse_up_fn = None
+    for name in ["mouse_up", "MouseUp", "mouse_release"]:
+        if hasattr(driver, name):
+            _mouse_up_fn = getattr(driver, name)
+            try:
+                _mouse_up_fn.argtypes = [ctypes.c_int]
+            except Exception:
+                pass
+            break
+
+    # 5. Resolve click
+    _click_fn = None
+    for name in ["click", "Click", "mouse_click"]:
+        if hasattr(driver, name):
+            _click_fn = getattr(driver, name)
+            break
+
+    # 6. Resolve device_close
+    _device_close_fn = None
+    for name in ["device_close", "close", "Close", "device_cleanup"]:
+        if hasattr(driver, name):
+            _device_close_fn = getattr(driver, name)
+            break
+
+    # Initialize device if open function exists
+    if _device_open_fn is not None:
+        try:
+            res = _device_open_fn()
+            print(f"[INFO] Logitech device_open returned: {res}")
+            # Usually 1 or >0 means success, or 0 on success in some implementations
+            # If function executes without throwing, driver is loaded
+        except Exception as e:
+            print(f"[WARN] Error calling device_open: {e}")
+
+    is_connected = True
+    print("[INFO] Logitech driver connected successfully (1PC Mode).")
+
+    # Start button listener thread for 1PC UI input monitoring
+    if not _listener_running:
+        _listener_running = True
+        _listener_thread = threading.Thread(target=_listen_mouse_buttons, daemon=True)
+        _listener_thread.start()
+
+    return True
+
+
+# Alias for backward compatibility
+connect_to_makcu = connect_to_logitech
+
+
+def _listen_mouse_buttons():
+    """Background listener to update button_states dictionary on 1PC."""
+    global _listener_running
+    while _listener_running:
+        try:
+            if os.name == "nt":
+                user32 = ctypes.windll.user32
+                with button_states_lock:
+                    for idx, vk in VK_MOUSE_MAP.items():
+                        state = bool(user32.GetAsyncKeyState(vk) & 0x8000)
+                        button_states[idx] = state
+            time.sleep(0.01)  # 100Hz polling for GUI status
+        except Exception:
+            time.sleep(0.05)
+
 
 def is_button_pressed(idx: int) -> bool:
+    """
+    Check if a mouse button is pressed on 1PC.
+    0: Left, 1: Right, 2: Middle, 3: Side 4, 4: Side 5
+    """
+    if os.name == "nt":
+        vk = VK_MOUSE_MAP.get(idx)
+        if vk is not None:
+            try:
+                return bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
+            except Exception:
+                pass
     with button_states_lock:
         return button_states.get(idx, False)
 
+
 def test_move():
-    if is_connected:
-        with makcu_lock:
-            makcu.write(b"km.move(100,100)\r")
-            makcu.flush()
-
-# --------------------------------------------------------------------
-# Button Lock / Masking helpers
-# --------------------------------------------------------------------
-
-# Index mapping: 0=L, 1=R, 2=M, 3=S4, 4=S5
-_LOCK_CMD_BY_IDX = {
-    0: "lock_ml",
-    1: "lock_mr",
-    2: "lock_mm",
-    3: "lock_ms1",
-    4: "lock_ms2",
-}
-
-# State tracked by mask manager (so we only send lock/unlock when needed)
-_mask_applied_idx = None
-
-def _send_cmd_no_wait(cmd: str):
-    """Send 'km.<cmd>\\r' without waiting for response (listener ignores ASCII)."""
+    """Perform a test movement with Logitech driver."""
     if not is_connected:
+        print("[WARN] Logitech driver is not connected.")
         return
-    with makcu_lock:
-        makcu.write(f"km.{cmd}\r".encode("ascii", "ignore"))
-        makcu.flush()
+    try:
+        with driver_lock:
+            if _moveR_fn:
+                _moveR_fn(50, 50)
+                time.sleep(0.05)
+                _moveR_fn(-50, -50)
+                print("[INFO] Test move executed successfully.")
+    except Exception as e:
+        print(f"[ERROR] Test move failed: {e}")
 
-def lock_button_idx(idx: int):
-    """Lock a single button by index (0..4)."""
-    cmd = _LOCK_CMD_BY_IDX.get(idx)
-    if cmd is None:
-        return
-    _send_cmd_no_wait(f"{cmd}(1)")
-
-def unlock_button_idx(idx: int):
-    """Unlock a single button by index (0..4)."""
-    cmd = _LOCK_CMD_BY_IDX.get(idx)
-    if cmd is None:
-        return
-    _send_cmd_no_wait(f"{cmd}(0)")
-
-def unlock_all_locks():
-    """Best-effort unlock of all lockable buttons."""
-    for i in range(5):
-        unlock_button_idx(i)
 
 def mask_manager_tick(selected_idx: int, aimbot_running: bool):
-    """Manage button locks based on selected_idx and aimbot_running state."""
-    
-    global _mask_applied_idx
+    """
+    Compatibility wrapper for button masking.
+    In 1PC with Logitech driver, raw driver injection does not require COM port masking.
+    """
+    pass
 
-    if not is_connected:
-        _mask_applied_idx = None
-        return
-
-    # clamp invalid index
-    if not isinstance(selected_idx, int) or not (0 <= selected_idx <= 4):
-        selected_idx = None
-
-    if not aimbot_running:
-        if _mask_applied_idx is not None:
-            unlock_button_idx(_mask_applied_idx)
-            _mask_applied_idx = None
-        return
-
-    # running: apply lock for selected_idx
-    if selected_idx is None:
-        # nothing selected -> make sure nothing is locked
-        if _mask_applied_idx is not None:
-            unlock_button_idx(_mask_applied_idx)
-            _mask_applied_idx = None
-        return
-
-    if _mask_applied_idx != selected_idx:
-        # switch lock to a new button
-        if _mask_applied_idx is not None:
-            unlock_button_idx(_mask_applied_idx)
-        lock_button_idx(selected_idx)
-        _mask_applied_idx = selected_idx
 
 class Mouse:
     _instance = None
     _listener = None
+
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -311,56 +243,109 @@ class Mouse:
 
     def __init__(self):
         if not hasattr(self, "_inited"):
-            if not connect_to_makcu():
-                print("[ERROR] Mouse init failed to connect.")
-            else:
-                Mouse._listener = threading.Thread(target=listen_makcu, daemon=True)
-                Mouse._listener.start()
+            if not connect_to_logitech():
+                print("[ERROR] Mouse init: Failed to connect to logitech.driver.dll")
             self._inited = True
 
     def move(self, x: float, y: float):
-        if not is_connected:
+        """Move mouse relative by dx, dy using Logitech driver."""
+        if not is_connected or _moveR_fn is None:
             return
-        dx, dy = int(x), int(y)
-        with makcu_lock:
-            makcu.write(f"km.move({dx},{dy})\r".encode())
-            makcu.flush()
+        dx, dy = int(round(x)), int(round(y))
+        if dx == 0 and dy == 0:
+            return
+        with driver_lock:
+            try:
+                _moveR_fn(dx, dy)
+            except Exception as e:
+                print(f"[WARN] Logitech move error: {e}")
 
     def move_bezier(self, x: float, y: float, segments: int, ctrl_x: float, ctrl_y: float):
-        if not is_connected:
+        """
+        Bezier curve movement using Logitech driver relative steps.
+        """
+        if not is_connected or _moveR_fn is None:
             return
-        with makcu_lock:
-            cmd = f"km.move({int(x)},{int(y)},{int(segments)},{int(ctrl_x)},{int(ctrl_y)})\r"
-            makcu.write(cmd.encode())
-            makcu.flush()
+
+        segments = max(1, int(segments))
+        target_x = float(x)
+        target_y = float(y)
+        cx = float(ctrl_x)
+        cy = float(ctrl_y)
+
+        last_px = 0.0
+        last_py = 0.0
+
+        for i in range(1, segments + 1):
+            t = i / float(segments)
+            # Quadratic Bezier: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2 (where P0 is 0,0)
+            cur_px = (2.0 * (1.0 - t) * t * cx) + (t * t * target_x)
+            cur_py = (2.0 * (1.0 - t) * t * cy) + (t * t * target_y)
+
+            step_x = int(round(cur_px - last_px))
+            step_y = int(round(cur_py - last_py))
+
+            if step_x != 0 or step_y != 0:
+                with driver_lock:
+                    try:
+                        _moveR_fn(step_x, step_y)
+                    except Exception:
+                        pass
+                last_px += step_x
+                last_py += step_y
+
+            time.sleep(0.001)
 
     def click(self):
+        """Send a left mouse click using Logitech driver."""
         if not is_connected:
             return
-        with makcu_lock:
-            makcu.write(b"km.left(1)\r")
-            makcu.flush()
-            makcu.write(b"km.left(0)\r")
-            makcu.flush()
+        with driver_lock:
+            try:
+                if _click_fn is not None:
+                    _click_fn()
+                elif _mouse_down_fn is not None and _mouse_up_fn is not None:
+                    _mouse_down_fn(1)  # 1 = Left button
+                    time.sleep(0.015)
+                    _mouse_up_fn(1)
+            except Exception as e:
+                print(f"[WARN] Logitech click error: {e}")
+
+    def press(self, button_code: int = 1):
+        """Press a mouse button (1=Left, 2=Right, 3=Middle)."""
+        if not is_connected or _mouse_down_fn is None:
+            return
+        with driver_lock:
+            try:
+                _mouse_down_fn(int(button_code))
+            except Exception as e:
+                print(f"[WARN] Logitech press error: {e}")
+
+    def release(self, button_code: int = 1):
+        """Release a mouse button (1=Left, 2=Right, 3=Middle)."""
+        if not is_connected or _mouse_up_fn is None:
+            return
+        with driver_lock:
+            try:
+                _mouse_up_fn(int(button_code))
+            except Exception as e:
+                print(f"[WARN] Logitech release error: {e}")
 
     @staticmethod
     def mask_manager_tick(selected_idx: int, aimbot_running: bool):
-        """Static wrapper so callers can do: Mouse.mask_manager_tick(idx, running)."""
         mask_manager_tick(selected_idx, aimbot_running)
 
     @staticmethod
     def cleanup():
-        global is_connected, makcu, _mask_applied_idx
-        # Always release any locks before closing port
-        try:
-            unlock_all_locks()
-        except Exception:
-            pass
-        _mask_applied_idx = None
-
+        global is_connected, driver, makcu, _listener_running
+        _listener_running = False
+        if _device_close_fn is not None and is_connected:
+            try:
+                _device_close_fn()
+            except Exception:
+                pass
         is_connected = False
-        if makcu and makcu.is_open:
-            makcu.close()
+        driver = None
+        makcu = None
         Mouse._instance = None
-        Mouse._listener = None
-        print("[INFO] Mouse serial cleaned up.")
+        print("[INFO] Logitech driver cleaned up.")

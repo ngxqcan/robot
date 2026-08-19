@@ -1,141 +1,58 @@
-# EVENTURI-AI for MAKCU
+# EVENTURI-AI (1PC Logitech Driver)
 
-The ultimate AI aimbot and detection GUI for Windows, supporting YOLOv8–v12 models and a range of USB serial devices.
-Made for the MAKCU community, with custom class selection for multiple games and super-smooth, modern UI.
+The ultimate AI aimbot and detection GUI for Windows (1PC setup), supporting YOLOv8–v12 models and Logitech Driver (`logitech.driver.dll`).
+Features custom class selection for multiple games and super-smooth, modern UI.
 
 ---
-## Disclamer
-This program is intended to be used as a 2pc setup.
+## Disclaimer
+This program is intended for 1PC setup using Logitech driver injection.
 I am not responsible for any account bans, penalties, or any other consequences that may result from using this program.
 Use it at your own risk and be aware of the potential implications.
 
-## Discord
-Join Discord for support
-https://discord.gg/BZnZeTjN38
-Join Makcu Discord for Makcu Support
-https://discord.gg/wHqqw5eWV5
+---
 ## Features
 
-Supports YOLOv8–v12 (PyTorch .pt, ONNX .onnx, TensorRT .engine)
-
-Device support out-of-the-box for:
-- MAKCU (1A86:55D3)
-- CH343 (1A86:5523)
-- CH340 (1A86:7523)
-- CH347 (1A86:5740)
-- CP2102 (10C4:EA60)
-
-Custom class selection for different games (target what matters)
-
-Fast aimbot with multiple modes: Normal, Bezier, Silent, Smooth/WindMouse
-
-Profile system: save, load, and reset configs
-
-Built with CustomTkinter for a polished, dark, responsive GUI
-
-DirectML and CUDA 12.6 support (choose the best for your GPU)
-
-Visual feedback for device connection, FPS, and AI status
+- **1PC Architecture**: High speed, ultra-low latency capture (DXGI / MSS) directly on your main machine.
+- **Logitech Driver Support**: Direct mouse injection via `logitech.driver.dll` (G HUB / Logitech Gaming Software).
+- **YOLOv8–v12 Support**: PyTorch (`.pt`), ONNX (`.onnx`), TensorRT (`.engine`).
+- **Aim Modes**: Normal, Bezier, Silent, and WindMouse Smooth aim.
+- **Triggerbot**: Integrated triggerbot with customizable radius, delay, cooldown, and confidence threshold.
+- **Profile System**: Save, load, and reset your custom configurations.
+- **Modern Dark GUI**: Built with CustomTkinter for a responsive and clean layout.
+- **Dual Acceleration**: DirectML (AMD/Intel/NVIDIA) and CUDA 12.6 support (NVIDIA).
 
 ---
 
-## Installation
+## Installation & Requirements
 
-NOTE: CUDA support is only for NVIDIA GPUs, and only CUDA 12.6 is supported at this time. If you’re on AMD or Intel GPU, use DirectML mode.
+### 1. Requirements
+- Windows 10/11
+- Logitech G HUB (or Logitech Gaming Software) installed and running.
+- Place `logitech.driver.dll` in the project folder (or `src/`).
 
----
+### 2. Setup
 
-1. Clone the repo
-
-git clone https://github.com/MAKCUAI/Eventuri-AI-MAKCU-v2
-cd Eventuri-AI-MAKCU-v2
-
----
-
-2. Setup for NVIDIA (CUDA 12.6 only)
-
-Download and install CUDA 12.6:
-NVIDIA CUDA 12.6 Download: https://developer.download.nvidia.com/compute/cuda/12.6.0/local_installers/cuda_12.6.0_560.76_windows.exe
-
-Run the CUDA installer and make sure everything is installed properly.
-
-In this folder, run:
-```install_setup_cuda.bat```
-
-When done, start the app:
-```run_eventuri_ai.bat```
-
----
-
-3. Setup for DirectML (AMD/Intel/NVIDIA)
-
-(No special driver install required.)
-
-In this folder, run:
-```install_setup_directml.bat```
-
-When done, start the app:
-```run_eventuri_ai.bat```
-
-DirectML is easiest to install and works with most GPUs, but is typically 5–10% slower than CUDA.
+- **NVIDIA GPU (CUDA 12.6)**:
+  Run `install_setup_cuda.bat`
+- **AMD / Intel / Any GPU (DirectML)**:
+  Run `install_setup_directml.bat`
 
 ---
 
 ## Usage
 
-Connect your device (see supported list above).
-
-Start the app with one of the .bat launchers.
-
-Select your AI model (.pt, .onnx, .engine) from the dropdown.
-
-Configure detection/aim settings, select your classes/game targets.
-
-Press START AIMBOT, change sensitivity to your in-game sens, hold your activation key, and you’re set.
-
----
-
-## Supported Devices
-
-| VID:PID     | Name    |
-|-------------|---------|
-| 1A86:55D3   | MAKCU   |
-| 1A86:5523   | CH343   |
-| 1A86:7523   | CH340   |
-| 1A86:5740   | CH347   |
-| 10C4:EA60   | CP2102  |
-
----
-
-## FAQ
-
-Q: What YOLO versions does this support?
-A: YOLOv8 to YOLOv12, in .pt, .onnx, and .engine formats.
-
-Q: Can I use it for any game?
-A: Yes—just select the correct model and target classes for your game in the GUI.
-
-Q: Do I need NVIDIA?
-A: No, you can use DirectML (for AMD, Intel, or NVIDIA). CUDA is just faster (NVIDIA only, CUDA 12.6 required).
-
-Q: My device isn’t recognized.
-A: Only the VID:PID list above is supported by default. For other hardware, ask in the issues.
+1. Put your `logitech.driver.dll` in the root folder or `src/` directory.
+2. Launch the app by running `run_eventuri_ai.bat`.
+3. In the GUI, click **Connect Driver** to initialize `logitech.driver.dll`.
+4. Click **Test Move** to verify cursor movement.
+5. Select your AI model (`models/` folder) and configure your target class and sensitivity.
+6. Click **START AIMBOT**, hold your designated mouse button, and enjoy!
 
 ---
 
 ## Troubleshooting
 
-"CUDA not found": Make sure you installed CUDA 12.6, not any other version.
-
-App crashes or fails to load models: Check your model file, device drivers, and dependencies.
-
----
-
-## Credits
-
-Made with ♥ by Ahmo934 and Jealousyhaha for the MAKCU Community.
-
----
-
-Enjoy!
-If you need more help or want to suggest a feature, open an issue or pull request.
+- **"Failed to load logitech.driver.dll"**:
+  Make sure `logitech.driver.dll` is placed in the project directory or `src/`, and ensure Logitech G HUB is running in the background.
+- **"CUDA not found"**:
+  Make sure CUDA 12.6 is installed, or switch to DirectML.

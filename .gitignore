@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+*.engine
+*.pt
+*.onnx
+.idea/
+.vscode/

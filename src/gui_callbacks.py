@@ -3,7 +3,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 import main
 from main import start_aimbot, stop_aimbot, is_aimbot_running, reload_model, get_model_classes, get_model_size
-from mouse import connect_to_makcu, button_states, button_states_lock
+from mouse import connect_to_logitech, connect_to_makcu, button_states, button_states_lock
 import os
 import glob
 import cv2
@@ -23,11 +23,13 @@ class GUICallbacks:
         # Update aimbot status 
         self.aimbot_status.set("Running" if is_aimbot_running() else "Stopped")
             
-        if config.makcu_connected:
-            self.connection_status.set(config.makcu_status_msg)
+        driver_ok = getattr(config, "logitech_connected", False) or getattr(config, "makcu_connected", False)
+        status_msg = getattr(config, "logitech_status_msg", "Disconnected")
+        if driver_ok:
+            self.connection_status.set(status_msg)
             self.connection_color.set("#00FF00")
         else:
-            self.connection_status.set(config.makcu_status_msg)
+            self.connection_status.set(status_msg)
             self.connection_color.set("#b71c1c")
         self.conn_status_lbl.configure(text_color=self.connection_color.get())
         self.conf_slider.set(config.conf)
@@ -43,13 +45,20 @@ class GUICallbacks:
         self.toggle_humanize()
         self.debug_checkbox_var.set(config.show_debug_window)
         self.input_check_var.set(False)
-        self.error_text.set("")
 
     def on_connect(self):
-        if connect_to_makcu():
-            self.error_text.set("")
+        if connect_to_logitech():
+            config.logitech_connected = True
+            config.logitech_status_msg = "Connected"
+            config.makcu_connected = True
+            config.makcu_status_msg = "Connected"
+            self.error_text.set("Logitech driver connected!")
         else:
-            self.error_text.set("Failed to connect! " + config.makcu_status_msg)
+            config.logitech_connected = False
+            config.logitech_status_msg = "Disconnected"
+            config.makcu_connected = False
+            config.makcu_status_msg = "Disconnected"
+            self.error_text.set("Failed to load logitech.driver.dll!")
         self.refresh_all()
 
     def update_fov(self, val):
