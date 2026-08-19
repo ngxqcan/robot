@@ -111,7 +111,7 @@ def capture_loop():
             else:
                 time.sleep(0.001)
 
-        except Exception as e:
+        except Exception:
             time.sleep(0.01)
 
     try:
@@ -120,53 +120,162 @@ def capture_loop():
         pass
 
 
-def draw_corner_rect(img, pt1, pt2, color, thickness=2, corner_len=12):
+def draw_corner_rect(img, pt1, pt2, color, thickness=2, corner_len=14):
     """Draw stylish corner brackets around bounding box."""
     x1, y1 = pt1
     x2, y2 = pt2
     w = x2 - x1
     h = y2 - y1
-    cl = min(corner_len, w // 2, h // 2)
+    cl = min(corner_len, max(4, w // 3), max(4, h // 3))
 
     # Top-Left
-    cv2.line(img, (x1, y1), (x1 + cl, y1), color, thickness)
-    cv2.line(img, (x1, y1), (x1, y1 + cl), color, thickness)
+    cv2.line(img, (x1, y1), (x1 + cl, y1), color, thickness, cv2.LINE_AA)
+    cv2.line(img, (x1, y1), (x1, y1 + cl), color, thickness, cv2.LINE_AA)
     # Top-Right
-    cv2.line(img, (x2, y1), (x2 - cl, y1), color, thickness)
-    cv2.line(img, (x2, y1), (x2, y1 + cl), color, thickness)
+    cv2.line(img, (x2, y1), (x2 - cl, y1), color, thickness, cv2.LINE_AA)
+    cv2.line(img, (x2, y1), (x2, y1 + cl), color, thickness, cv2.LINE_AA)
     # Bottom-Left
-    cv2.line(img, (x1, y2), (x1 + cl, y2), color, thickness)
-    cv2.line(img, (x1, y2), (x1, y2 - cl), color, thickness)
+    cv2.line(img, (x1, y2), (x1 + cl, y2), color, thickness, cv2.LINE_AA)
+    cv2.line(img, (x1, y2), (x1, y2 - cl), color, thickness, cv2.LINE_AA)
     # Bottom-Right
-    cv2.line(img, (x2, y2), (x2 - cl, y2), color, thickness)
-    cv2.line(img, (x2, y2), (x2, y2 - cl), color, thickness)
+    cv2.line(img, (x2, y2), (x2 - cl, y2), color, thickness, cv2.LINE_AA)
+    cv2.line(img, (x2, y2), (x2, y2 - cl), color, thickness, cv2.LINE_AA)
 
 
-def draw_cyber_pill(img, text, center_pt, bg_color=(20, 20, 24), border_color=(34, 96, 255), text_color=(240, 240, 240)):
-    """Draw a modern pill tag with border above target."""
+def draw_cyber_pill(img, text, center_pt, bg_color=(10, 10, 14), border_color=(34, 96, 255), text_color=(255, 255, 255), is_active=False):
+    """Draw a modern pill tag with border above target (matching screenshot)."""
     cx, cy = center_pt
     font = cv2.FONT_HERSHEY_SIMPLEX
-    scale = 0.42
+    scale = 0.38
     thick = 1
     (tw, th), baseline = cv2.getTextSize(text, font, scale, thick)
 
-    pad_x = 8
-    pad_y = 4
-    x1 = cx - (tw // 2) - pad_x
-    y1 = cy - th - pad_y
-    x2 = cx + (tw // 2) + pad_x
-    y2 = cy + pad_y
+    pad_x = 6
+    pad_y = 3
+    x1 = max(2, cx - (tw // 2) - pad_x)
+    x2 = min(img.shape[1] - 2, cx + (tw // 2) + pad_x)
+    y2 = cy
+    y1 = max(2, y2 - th - (pad_y * 2))
 
-    # Clamp
-    h, w = img.shape[:2]
-    if y1 < 2:
-        y1 = 2
-        y2 = y1 + th + 2 * pad_y
+    if is_active:
+        # Highlighted Active Target Pill (bright orange border, black background)
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 0), -1)
+        cv2.rectangle(img, (x1, y1), (x2, y2), (34, 96, 255), 2, cv2.LINE_AA)
+    else:
+        # Standard Target Pill
+        cv2.rectangle(img, (x1, y1), (x2, y2), bg_color, -1)
+        cv2.rectangle(img, (x1, y1), (x2, y2), border_color, 1, cv2.LINE_AA)
 
-    # Draw rounded-like pill background
-    cv2.rectangle(img, (x1, y1), (x2, y2), bg_color, -1)
-    cv2.rectangle(img, (x1, y1), (x2, y2), border_color, 1)
-    cv2.putText(img, text, (x1 + pad_x, y2 - pad_y - baseline // 2 + 2), font, scale, text_color, thick, cv2.LINE_AA)
+    cv2.putText(img, text, (x1 + pad_x, y2 - pad_y), font, scale, text_color, thick, cv2.LINE_AA)
+
+
+def group_detections_into_entities(raw_detections):
+    """
+    Groups raw YOLO detections into coherent Bot Entities (Head + Body pairs).
+    Returns list of entity dictionaries.
+    """
+    heads = [d for d in raw_detections if d['type'] == "head"]
+    bodies = [d for d in raw_detections if d['type'] == "player"]
+    others = [d for d in raw_detections if d['type'] == "other"]
+
+    entities = []
+    used_heads = set()
+    used_bodies = set()
+
+    # Match heads to their corresponding body box
+    for bi, body in enumerate(bodies):
+        bx1, by1, bx2, by2 = body['x1'], body['y1'], body['x2'], body['y2']
+        bw = bx2 - bx1
+        bh = by2 - by1
+
+        matched_head = None
+        min_dist_to_body_top = float('inf')
+
+        for hi, head in enumerate(heads):
+            if hi in used_heads:
+                continue
+            hx1, hy1, hx2, hy2 = head['x1'], head['y1'], head['x2'], head['y2']
+            hcx = (hx1 + hx2) / 2.0
+            hcy = (hy1 + hy2) / 2.0
+
+            # Check if head is vertically near top of body and horizontally aligned
+            if (bx1 - bw * 0.4) <= hcx <= (bx2 + bw * 0.4) and (by1 - bh * 0.5) <= hcy <= (by1 + bh * 0.6):
+                d = abs(hcx - (bx1 + bx2) / 2.0) + abs(hcy - by1)
+                if d < min_dist_to_body_top:
+                    min_dist_to_body_top = d
+                    matched_head = (hi, head)
+
+        if matched_head is not None:
+            hi, head = matched_head
+            used_heads.add(hi)
+            used_bodies.add(bi)
+            entities.append({
+                'has_head': True,
+                'has_body': True,
+                'head': head,
+                'body': body,
+                'head_center': ((head['x1'] + head['x2']) / 2.0, (head['y1'] + head['y2']) / 2.0),
+                'body_center': ((body['x1'] + body['x2']) / 2.0, (body['y1'] + body['y2']) / 2.0),
+                'top_y': min(head['y1'], body['y1']),
+                'center_x': (head['x1'] + head['x2']) / 2.0,
+                'conf_body': body['conf'],
+                'conf_head': head['conf'],
+                'cls_body': body['cls'],
+                'cls_head': head['cls']
+            })
+        else:
+            used_bodies.add(bi)
+            entities.append({
+                'has_head': False,
+                'has_body': True,
+                'head': None,
+                'body': body,
+                'head_center': None,
+                'body_center': ((body['x1'] + body['x2']) / 2.0, (body['y1'] + body['y2']) / 2.0),
+                'top_y': body['y1'],
+                'center_x': (body['x1'] + body['x2']) / 2.0,
+                'conf_body': body['conf'],
+                'conf_head': None,
+                'cls_body': body['cls'],
+                'cls_head': None
+            })
+
+    # Unpaired heads
+    for hi, head in enumerate(heads):
+        if hi not in used_heads:
+            entities.append({
+                'has_head': True,
+                'has_body': False,
+                'head': head,
+                'body': None,
+                'head_center': ((head['x1'] + head['x2']) / 2.0, (head['y1'] + head['y2']) / 2.0),
+                'body_center': None,
+                'top_y': head['y1'],
+                'center_x': (head['x1'] + head['x2']) / 2.0,
+                'conf_body': None,
+                'conf_head': head['conf'],
+                'cls_body': None,
+                'cls_head': head['cls']
+            })
+
+    # Other detections
+    for other in others:
+        entities.append({
+            'has_head': False,
+            'has_body': False,
+            'head': None,
+            'body': other,
+            'head_center': None,
+            'body_center': ((other['x1'] + other['x2']) / 2.0, (other['y1'] + other['y2']) / 2.0),
+            'top_y': other['y1'],
+            'center_x': (other['x1'] + other['x2']) / 2.0,
+            'conf_body': other['conf'],
+            'conf_head': None,
+            'cls_body': other['cls'],
+            'cls_head': None
+        })
+
+    return entities
 
 
 def detection_and_aim_loop():
@@ -213,10 +322,7 @@ def detection_and_aim_loop():
         # Run AI detection
         results = perform_detection(model, image)
 
-        all_targets = []
-        head_targets = []
-        body_targets = []
-        detected_boxes_info = []
+        raw_detections = []
 
         if results:
             for result in results:
@@ -246,57 +352,72 @@ def detection_and_aim_loop():
                     # Check player match
                     elif player_label and (player_label == class_name_str or player_label == cls_str or (len(player_label) > 1 and player_label in class_name_str)):
                         is_player = True
+                    else:
+                        # Auto default: if 0 and 1 exist, 1 is head, 0 is player
+                        if cls == 1 or "head" in class_name_str:
+                            is_head = True
+                        elif cls == 0 or "player" in class_name_str or "enemy" in class_name_str or "bot" in class_name_str:
+                            is_player = True
 
                     target_type = "head" if is_head else ("player" if is_player else "other")
-                    center_x = (x1 + x2) / 2.0
-                    center_y = (y1 + y2) / 2.0
 
-                    if is_player:
-                        # Player offset
-                        center_y = y1 + config.player_y_offset
-
-                    dist = math.hypot(center_x - crop_center_x, center_y - crop_center_y)
-
-                    target_entry = {
-                        'dist': dist,
-                        'center_x': center_x,
-                        'center_y': center_y,
+                    raw_detections.append({
                         'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
                         'type': target_type,
                         'class': class_name,
                         'cls': cls,
                         'conf': conf
-                    }
+                    })
 
-                    detected_boxes_info.append(target_entry)
+        # Group raw detections into Bot Entities
+        entities = group_detections_into_entities(raw_detections)
 
-                    if is_head or is_player:
-                        # Only target if within FOV circle
-                        if dist <= fov_radius:
-                            if is_head:
-                                head_targets.append(target_entry)
-                            else:
-                                body_targets.append(target_entry)
-                            all_targets.append(target_entry)
+        # Calculate Aim Point and Distance from Crosshair for each entity
+        valid_aim_targets = []
+        for ent in entities:
+            aim_x = None
+            aim_y = None
 
-        # Smart Head Priority Target Selection
+            if ent['has_head'] and getattr(config, "head_priority", True):
+                aim_x, aim_y = ent['head_center']
+                target_conf = ent['conf_head']
+            elif ent['has_body']:
+                bx1, by1, bx2, by2 = ent['body']['x1'], ent['body']['y1'], ent['body']['x2'], ent['body']['y2']
+                aim_x = (bx1 + bx2) / 2.0
+                aim_y = by1 + config.player_y_offset
+                target_conf = ent['conf_body']
+            elif ent['has_head']:
+                aim_x, aim_y = ent['head_center']
+                target_conf = ent['conf_head']
+
+            if aim_x is not None and aim_y is not None:
+                dist = math.hypot(aim_x - crop_center_x, aim_y - crop_center_y)
+                ent['aim_x'] = aim_x
+                ent['aim_y'] = aim_y
+                ent['dist'] = dist
+                ent['target_conf'] = target_conf
+
+                # Filter by FOV circle
+                if dist <= fov_radius:
+                    valid_aim_targets.append(ent)
+            else:
+                ent['dist'] = float('inf')
+
+        # Target Selection: Closest to Crosshair
         best_target = None
-        if getattr(config, "head_priority", True) and head_targets:
-            best_target = min(head_targets, key=lambda t: t['dist'])
-        elif all_targets:
-            # Target hysteresis: if we were tracking a target nearby, prefer it
+        if valid_aim_targets:
             if config.target_lock_hysteresis and _last_locked_target_pos is not None:
                 lx, ly = _last_locked_target_pos
-                close_candidates = [t for t in all_targets if math.hypot(t['center_x'] - lx, t['center_y'] - ly) < 30]
+                close_candidates = [t for t in valid_aim_targets if math.hypot(t['aim_x'] - lx, t['aim_y'] - ly) < 35]
                 if close_candidates:
                     best_target = min(close_candidates, key=lambda t: t['dist'])
                 else:
-                    best_target = min(all_targets, key=lambda t: t['dist'])
+                    best_target = min(valid_aim_targets, key=lambda t: t['dist'])
             else:
-                best_target = min(all_targets, key=lambda t: t['dist'])
+                best_target = min(valid_aim_targets, key=lambda t: t['dist'])
 
         if best_target is not None:
-            _last_locked_target_pos = (best_target['center_x'], best_target['center_y'])
+            _last_locked_target_pos = (best_target['aim_x'], best_target['aim_y'])
         else:
             _last_locked_target_pos = None
 
@@ -305,13 +426,13 @@ def detection_and_aim_loop():
         should_aim = (button_held or config.always_on_aim) and (best_target is not None) and (active_driver is not None)
 
         if should_aim and best_target:
-            target_screen_x = region_left + best_target['center_x']
-            target_screen_y = region_top + best_target['center_y']
+            target_screen_x = region_left + best_target['aim_x']
+            target_screen_y = region_top + best_target['aim_y']
 
             dx = target_screen_x - crosshair_x
             dy = target_screen_y - crosshair_y
 
-            # Sensitivity multiplier
+            # Sensitivity scaling
             sens = config.in_game_sens
             distance = 1.07437623 * math.pow(sens, -0.9936827126)
             dx *= distance
@@ -351,13 +472,13 @@ def detection_and_aim_loop():
                     trigger_btn_idx = int(getattr(config, "trigger_button", 0))
                     trigger_active = is_button_pressed(trigger_btn_idx)
 
-                if trigger_active and all_targets:
+                if trigger_active and valid_aim_targets:
                     min_conf = float(getattr(config, "trigger_min_conf", 0.35))
                     radius_px = int(getattr(config, "trigger_radius_px", 10))
                     delay_ms = int(getattr(config, "trigger_delay_ms", 25) * random.uniform(0.9, 1.1))
                     cooldown_ms = int(getattr(config, "trigger_cooldown_ms", 120) * random.uniform(0.9, 1.1))
 
-                    candidates = [t for t in all_targets if (t['conf'] >= min_conf and t['dist'] <= radius_px)]
+                    candidates = [t for t in valid_aim_targets if (t['target_conf'] >= min_conf and t['dist'] <= radius_px)]
 
                     now = _now_ms()
                     global _in_zone_since_ms, _last_trigger_time_ms
@@ -383,52 +504,64 @@ def detection_and_aim_loop():
         except Exception:
             pass
 
-        # --- Cyber Live HUD Renderer (In-App Preview & Debug Window) ---
+        # --- Cyber Live HUD Renderer (Matching Exact Screenshot) ---
         if config.show_preview or config.show_debug_window:
             hud_img = image.copy()
             ih, iw = hud_img.shape[:2]
             cx, cy = int(crop_center_x), int(crop_center_y)
 
-            # 1. Draw Cyan FOV circle
-            if getattr(config, "preview_fov", True):
-                fov_color = (255, 229, 0)  # BGR Cyan (#00e5ff)
-                cv2.circle(hud_img, (cx, cy), int(fov_radius), fov_color, 1, cv2.LINE_AA)
-
-            # 2. Draw Detections with Cyber Styling
+            # 1. Draw Detections & Entities
             if getattr(config, "preview_boxes", True):
-                for box in detected_boxes_info:
-                    x1, y1, x2, y2 = box['x1'], box['y1'], box['x2'], box['y2']
-                    conf_pct = int(box['conf'] * 100)
-                    cls_idx = box['cls']
-                    btype = box['type']
+                for ent in entities:
+                    is_active_target = (ent is best_target)
 
-                    if btype == "head":
-                        # Green Head Box (#00e676 -> BGR: 118, 230, 0)
-                        cv2.rectangle(hud_img, (x1, y1), (x2, y2), (118, 230, 0), 2, cv2.LINE_AA)
-                    elif btype == "player":
-                        # Orange Corner Brackets (#ff6022 -> BGR: 34, 96, 255)
-                        draw_corner_rect(hud_img, (x1, y1), (x2, y2), (34, 96, 255), thickness=2, corner_len=14)
-                    else:
-                        # Neutral Box
-                        cv2.rectangle(hud_img, (x1, y1), (x2, y2), (160, 160, 160), 1)
+                    # Draw Head Box (Neon Green)
+                    if ent['has_head']:
+                        hx1, hy1, hx2, hy2 = ent['head']['x1'], ent['head']['y1'], ent['head']['x2'], ent['head']['y2']
+                        cv2.rectangle(hud_img, (hx1, hy1), (hx2, hy2), (118, 230, 0), 2, cv2.LINE_AA)
 
-                    # Pill Badge: `[0] 92% | [1] 90%`
-                    pill_text = f"[{cls_idx}] {conf_pct}%"
-                    mid_x = (x1 + x2) // 2
-                    draw_cyber_pill(hud_img, pill_text, (mid_x, y1 - 4), border_color=(34, 96, 255) if btype != "head" else (118, 230, 0))
+                    # Draw Body Box (Orange Corner Brackets)
+                    if ent['has_body']:
+                        bx1, by1, bx2, by2 = ent['body']['x1'], ent['body']['y1'], ent['body']['x2'], ent['body']['y2']
+                        draw_corner_rect(hud_img, (bx1, by1), (bx2, by2), (34, 96, 255), thickness=2, corner_len=14)
 
-            # 3. Draw Target Lock Point & Vector Line
+                    # Draw Pill Header: `[0] 82% | [1] 81%`
+                    pill_parts = []
+                    if ent['has_body']:
+                        pill_parts.append(f"[{ent['cls_body']}] {int(ent['conf_body'] * 100)}%")
+                    if ent['has_head']:
+                        pill_parts.append(f"[{ent['cls_head']}] {int(ent['conf_head'] * 100)}%")
+                    
+                    if pill_parts:
+                        pill_text = " | ".join(pill_parts)
+                        pill_cx = int(ent['center_x'])
+                        pill_cy = int(ent['top_y'] - 6)
+                        draw_cyber_pill(
+                            hud_img, pill_text, (pill_cx, pill_cy),
+                            border_color=(34, 96, 255) if is_active_target else (100, 100, 120),
+                            is_active=is_active_target
+                        )
+
+            # 2. Draw Center Crosshair: Cyan Circle with Center Dot
+            if getattr(config, "preview_fov", True):
+                # Hollow Cyan Circle at center (Radius 12px)
+                cv2.circle(hud_img, (cx, cy), 12, (255, 229, 0), 2, cv2.LINE_AA)
+                cv2.circle(hud_img, (cx, cy), 2, (255, 229, 0), -1, cv2.LINE_AA)
+
+            # 3. Draw Aim Vector Line & Target Lock Marker (Matching Screenshot)
             if getattr(config, "preview_vectors", True) and best_target is not None:
-                tx = int(best_target['center_x'])
-                ty = int(best_target['center_y'])
-                # Pink / Magenta Target Lock (#ff007f -> BGR: 127, 0, 255)
-                cv2.circle(hud_img, (tx, ty), 6, (127, 0, 255), -1, cv2.LINE_AA)
-                cv2.circle(hud_img, (tx, ty), 9, (255, 255, 255), 1, cv2.LINE_AA)
-                # Cyan connection vector line
+                tx = int(best_target['aim_x'])
+                ty = int(best_target['aim_y'])
+
+                # Cyan Aim Vector connecting center crosshair circle to target head
                 cv2.line(hud_img, (cx, cy), (tx, ty), (255, 229, 0), 2, cv2.LINE_AA)
 
-            # 4. Center Crosshair Dot
-            cv2.circle(hud_img, (cx, cy), 2, (255, 255, 255), -1, cv2.LINE_AA)
+                # Pink / Magenta Target Lock Marker (#ff007f -> BGR: 127, 0, 255)
+                cv2.circle(hud_img, (tx, ty), 6, (127, 0, 255), -1, cv2.LINE_AA)
+                cv2.circle(hud_img, (tx, ty), 8, (255, 255, 255), 1, cv2.LINE_AA)
+                # Inner crosshair in pink target dot
+                cv2.line(hud_img, (tx - 4, ty), (tx + 4, ty), (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.line(hud_img, (tx, ty - 4), (tx, ty + 4), (255, 255, 255), 1, cv2.LINE_AA)
 
             # Store for in-app Preview tab
             set_latest_preview_frame(hud_img)
