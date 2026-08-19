@@ -3,7 +3,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 import main
 from main import start_aimbot, stop_aimbot, is_aimbot_running, reload_model, get_model_classes, get_model_size
-from mouse import connect_to_logitech, connect_to_makcu, button_states, button_states_lock
+from mouse import connect_to_logitech, button_states, button_states_lock
 import os
 import glob
 import cv2
@@ -23,7 +23,7 @@ class GUICallbacks:
         # Update aimbot status 
         self.aimbot_status.set("Running" if is_aimbot_running() else "Stopped")
             
-        driver_ok = getattr(config, "logitech_connected", False) or getattr(config, "makcu_connected", False)
+        driver_ok = getattr(config, "logitech_connected", False)
         status_msg = getattr(config, "logitech_status_msg", "Disconnected")
         if driver_ok:
             self.connection_status.set(status_msg)
@@ -50,14 +50,10 @@ class GUICallbacks:
         if connect_to_logitech():
             config.logitech_connected = True
             config.logitech_status_msg = "Connected"
-            config.makcu_connected = True
-            config.makcu_status_msg = "Connected"
             self.error_text.set("Logitech driver connected!")
         else:
             config.logitech_connected = False
             config.logitech_status_msg = "Disconnected"
-            config.makcu_connected = False
-            config.makcu_status_msg = "Disconnected"
             self.error_text.set("Failed to load logitech.driver.dll!")
         self.refresh_all()
 

@@ -87,8 +87,6 @@ class Config:
         self.selected_mouse_button = 3   # Side 4 Mouse Button
         self.logitech_connected = False
         self.logitech_status_msg = "Disconnected"
-        self.makcu_connected = False
-        self.makcu_status_msg = "Disconnected"
         self.aim_humanization = 1
         self.in_game_sens = 1.15         # Sensitivity multiplier
         self.button_mask = False

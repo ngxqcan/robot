@@ -9,7 +9,7 @@ import random
 
 from mouse import Mouse, is_button_pressed, test_move
 from capture import get_camera
-from detection import load_model, perform_detection, get_model_size, get_class_names
+from detection import load_model, perform_detection, get_model_size, get_class_names, reload_model
 from config import config
 from windmouse_smooth import smooth_aimer
 
@@ -23,7 +23,6 @@ fps = 0.0
 frame_queue = queue.Queue(maxsize=1)
 smooth_move_queue = queue.Queue(maxsize=10)
 driver = None  # Mouse driver instance
-makcu = None   # Backward compatibility alias
 
 _last_trigger_time_ms = 0.0
 _in_zone_since_ms = 0.0
@@ -59,8 +58,8 @@ def smooth_movement_loop():
     """
     Dedicated thread for executing smooth mouse movements with micro-second precision.
     """
-    global _aimbot_running, driver, makcu
-    active_driver = driver or makcu
+    global _aimbot_running, driver
+    active_driver = driver
     while _aimbot_running:
         try:
             move_data = smooth_move_queue.get(timeout=0.05)
@@ -280,12 +279,12 @@ def group_detections_into_entities(raw_detections):
 
 def detection_and_aim_loop():
     """CONSUMER: High-performance GPU inference, anti-shaking targeting, and recoil control."""
-    global _aimbot_running, fps, driver, makcu
+    global _aimbot_running, fps, driver
     global _last_locked_target_pos, _last_locked_entity, _smoothed_aim_point
     global _subpixel_carry_x, _subpixel_carry_y, _firing_start_ms
 
     model, class_names = load_model(config.model_path)
-    active_driver = driver or makcu
+    active_driver = driver
 
     frame_count = 0
     start_time = time.perf_counter()

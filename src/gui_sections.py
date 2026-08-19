@@ -22,14 +22,14 @@ class GUISections:
         self.error_lbl.pack(side="right", padx=8)
         
         # --- DRIVER CONTROLS ---
-        makcu_frame = ctk.CTkFrame(self, fg_color=BG)
-        makcu_frame.pack(fill="x", padx=10, pady=(0, 8))
-        self.connect_btn = neon_button(makcu_frame, text="Connect Driver", command=self.on_connect)
+        driver_frame = ctk.CTkFrame(self, fg_color=BG)
+        driver_frame.pack(fill="x", padx=10, pady=(0, 8))
+        self.connect_btn = neon_button(driver_frame, text="Connect Driver", command=self.on_connect)
         self.connect_btn.pack(side="left", padx=(10, 5), pady=8)
-        ctk.CTkButton(makcu_frame, text="Test Move", command=test_move, fg_color="#181818", hover_color="#000000").pack(side="left", padx=8)
-        self.debug_checkbox = ctk.CTkCheckBox(makcu_frame, text="Show Debug Window", variable=self.debug_checkbox_var, onvalue=True, offvalue=False, text_color="#fff", command=self.on_debug_toggle)
+        ctk.CTkButton(driver_frame, text="Test Move", command=test_move, fg_color="#181818", hover_color="#000000").pack(side="left", padx=8)
+        self.debug_checkbox = ctk.CTkCheckBox(driver_frame, text="Show Debug Window", variable=self.debug_checkbox_var, onvalue=True, offvalue=False, text_color="#fff", command=self.on_debug_toggle)
         self.debug_checkbox.pack(side="left", padx=8)
-        self.input_check_checkbox = ctk.CTkCheckBox(makcu_frame, text="Show Input Check", variable=self.input_check_var, onvalue=True, offvalue=False, text_color="#fff", command=self.on_input_check_toggle)
+        self.input_check_checkbox = ctk.CTkCheckBox(driver_frame, text="Show Input Check", variable=self.input_check_var, onvalue=True, offvalue=False, text_color="#fff", command=self.on_input_check_toggle)
         self.input_check_checkbox.pack(side="left", padx=8)
         
         # --- DETECTION SETTINGS (Enhanced) ---

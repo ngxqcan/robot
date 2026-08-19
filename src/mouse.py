@@ -13,10 +13,6 @@ button_states_lock = threading.Lock()
 _listener_running = False
 _listener_thread = None
 
-# Backward compatibility alias
-makcu = None
-makcu_lock = driver_lock
-
 # Virtual Key Mapping for 1PC mouse button detection
 # 0: Left, 1: Right, 2: Middle, 3: Side 4 (XBUTTON1), 4: Side 5 (XBUTTON2)
 VK_MOUSE_MAP = {
@@ -58,7 +54,7 @@ def connect_to_logitech():
     """
     Load logitech.driver.dll and initialize Logitech driver connection for 1PC.
     """
-    global driver, is_connected, makcu
+    global driver, is_connected
     global _device_open_fn, _moveR_fn, _mouse_down_fn, _mouse_up_fn, _click_fn, _device_close_fn
     global _listener_running, _listener_thread
 
@@ -79,17 +75,14 @@ def connect_to_logitech():
         print(f"[ERROR] Could not load Logitech driver DLL '{dll_path}': {e}")
         is_connected = False
         driver = None
-        makcu = None
         return False
 
     if loaded_dll is None:
         is_connected = False
         driver = None
-        makcu = None
         return False
 
     driver = loaded_dll
-    makcu = driver
 
     # 1. Resolve device_open / init
     _device_open_fn = None
@@ -170,10 +163,6 @@ def connect_to_logitech():
         _listener_thread.start()
 
     return True
-
-
-# Alias for backward compatibility
-connect_to_makcu = connect_to_logitech
 
 
 def _listen_mouse_buttons():
@@ -343,7 +332,7 @@ class Mouse:
 
     @staticmethod
     def cleanup():
-        global is_connected, driver, makcu, _listener_running
+        global is_connected, driver, _listener_running
         _listener_running = False
         if _device_close_fn is not None and is_connected:
             try:
@@ -352,6 +341,5 @@ class Mouse:
                 pass
         is_connected = False
         driver = None
-        makcu = None
         Mouse._instance = None
         print("[INFO] Logitech driver cleaned up.")

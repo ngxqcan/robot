@@ -28,8 +28,6 @@
   "selected_mouse_button": 3,
   "logitech_connected": true,
   "logitech_status_msg": "Connected",
-  "makcu_connected": true,
-  "makcu_status_msg": "Connected",
   "aim_humanization": 1,
   "in_game_sens": 1.15,
   "button_mask": false,

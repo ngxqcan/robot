@@ -9,7 +9,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 from config import config
-from mouse import Mouse, connect_to_logitech, connect_to_makcu, test_move, is_connected as mouse_is_connected
+from mouse import Mouse, connect_to_logitech, test_move, is_connected as mouse_is_connected
 import main
 from main import (
     start_aimbot, stop_aimbot, is_aimbot_running,
