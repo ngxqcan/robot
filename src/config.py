@@ -48,102 +48,100 @@ w, h = get_foreground_monitor_resolution()
 
 class Config:
     def __init__(self):
-        # --- General Settings (1PC) ---
-        self.region_size = 256
+        # --- General Settings (1PC Radiant Profile) ---
+        self.region_size = 180            # Tight FOV for legit Radiant micro-flicks
         w, h = get_foreground_monitor_resolution()
         self.screen_width = w
         self.screen_height = h
-        self.player_y_offset = 5  # Offset for player detection
-        self.capturer_mode = "DXGI"  # Default to DXGI mode for high-performance 1PC capture
+        self.player_y_offset = 3          # Direct Head/Upper Neck alignment
+        self.capturer_mode = "DXGI"       # DXGI Hardware ROI (Ultra-fast)
         self.target_fps = 240
         self.always_on_aim = False
-        self.head_priority = True
+        self.head_priority = True         # 100% Headshot Lock Priority
         self.target_lock_hysteresis = True
         self.main_pc_width = w
         self.main_pc_height = h
 
         # --- Anti-Shaking & Deadzone Settings ---
-        self.aim_deadzone = 2.0           # Deadzone radius (px): completely prevents shaking near target
-        self.aim_smoothing_factor = 0.60  # Exponential Moving Average filter (0.0=raw, 0.9=ultra smooth)
+        self.aim_deadzone = 1.8           # 1.8px deadzone for crisp lock with 0 shaking
+        self.aim_smoothing_factor = 0.70  # EMA Smooth Filter (Smooth Radiant curve)
 
         # --- Recoil Control System (RCS) ---
-        self.rcs_enabled = False          # Enable Recoil Control
-        self.rcs_strength_y = 2.8         # Vertical recoil compensation pull strength
-        self.rcs_strength_x = 0.0         # Horizontal recoil compensation
-        self.rcs_delay_ms = 45            # Delay after firing before RCS kicks in (ms)
+        self.rcs_enabled = True           # Enable Recoil Control
+        self.rcs_strength_y = 2.2         # Subtle vertical pull (First bullets one-tap, then pull)
+        self.rcs_strength_x = 0.0         # Horizontal compensation
+        self.rcs_delay_ms = 60            # 60ms first-bullet accuracy delay
 
         # --- Model and Detection ---
         self.models_dir = "models"
         self.model_path = os.path.join(self.models_dir, "Click here to Load a model")
-        self.custom_player_label = "Select a Player Class"  
-        self.custom_head_label = "Select a Head Class"  
+        self.custom_player_label = "0"    # Class 0: Body
+        self.custom_head_label = "1"      # Class 1: Head
         self.model_file_size = 0
         self.model_load_error = ""
-        self.conf = 0.25
+        self.conf = 0.35                  # 0.35 clean confidence threshold
         self.imgsz = 640
-        self.max_detect = 50
+        self.max_detect = 30
         
         # --- Mouse / Logitech Driver ---
-        self.selected_mouse_button = 3   # Default to side/middle mouse button (3: Side 4)
+        self.selected_mouse_button = 3   # Side 4 Mouse Button
         self.logitech_connected = False
         self.logitech_status_msg = "Disconnected"
-        self.makcu_connected = False  # Compatibility alias
+        self.makcu_connected = False
         self.makcu_status_msg = "Disconnected"
-        self.aim_humanization = 0  # Default to no humanization
-        self.in_game_sens = 1.3  # Default smoothing
-        self.button_mask = False  # Button masking toggle
+        self.aim_humanization = 1
+        self.in_game_sens = 1.15         # Sensitivity multiplier
+        self.button_mask = False
 
-        # --- Trigger Settings ---
-        self.trigger_enabled         = False
+        # --- Trigger Settings (Radiant Instant One-Tap) ---
+        self.trigger_enabled         = True
         self.trigger_always_on       = False
-        self.trigger_button          = 1        # 0: Left, 1: Right, 2: Middle, 3: Side4, 4: Side5
-        self.trigger_radius_px       = 10       # how close to crosshair (px)
-        self.trigger_delay_ms        = 25       # delay before click
-        self.trigger_cooldown_ms     = 120      # time between clicks
-        self.trigger_min_conf        = 0.35     # min conf to shoot
+        self.trigger_button          = 1        # Right Click or Side Key
+        self.trigger_radius_px       = 7        # Tight 7px headshot zone
+        self.trigger_delay_ms        = 18       # Sub-human 18ms assist delay
+        self.trigger_cooldown_ms     = 160      # Cooldown for tap-fire rifles (Vandal/Phantom)
+        self.trigger_min_conf        = 0.42     # High confidence for trigger
 
-        # --- Aimbot Mode ---
-        self.mode = "normal"    
+        # --- Aimbot Mode (Radiant Smooth Curves) ---
+        self.mode = "bezier"             # Bezier curves for natural pro aim
         self.aimbot_running = False
         self.aimbot_status_msg = "Stopped"
 
         # --- Normal Aim ---
-        self.normal_x_speed = 0.55
-        self.normal_y_speed = 0.55
+        self.normal_x_speed = 0.65
+        self.normal_y_speed = 0.65
 
         # --- Bezier Aim ---
-        self.bezier_segments = 8
-        self.bezier_ctrl_x = 16
-        self.bezier_ctrl_y = 16
+        self.bezier_segments = 10
+        self.bezier_ctrl_x = 8.0
+        self.bezier_ctrl_y = 8.0
 
         # --- Silent Aim ---
         self.silent_segments = 7
-        self.silent_ctrl_x = 18
-        self.silent_ctrl_y = 18
+        self.silent_ctrl_x = 14.0
+        self.silent_ctrl_y = 14.0
         self.silent_speed = 3
         self.silent_cooldown = 0.18
 
-        # --- Smooth Aim (WindMouse) ---
-        self.smooth_gravity = 9.0          # Gravitational pull towards target (1-20)
-        self.smooth_wind = 3.0             # Wind randomness effect (1-20)  
-        self.smooth_min_delay = 0.0        # Minimum delay between steps (seconds)
-        self.smooth_max_delay = 0.002      # Maximum delay between steps (seconds)
-        self.smooth_max_step = 40.0        # Maximum pixels per step
-        self.smooth_min_step = 2.0         # Minimum pixels per step
-        self.smooth_max_step_ratio = 0.20  # Max step as ratio of total distance
-        self.smooth_target_area_ratio = 0.06  # Stop when within this ratio of distance
-        
-        # Human-like behavior settings
-        self.smooth_reaction_min = 0.05    # Min reaction time to new targets (seconds)
-        self.smooth_reaction_max = 0.21    # Max reaction time to new targets (seconds)
-        self.smooth_close_range = 35       # Distance considered "close" (pixels)
-        self.smooth_far_range = 250        # Distance considered "far" (pixels) 
-        self.smooth_close_speed = 0.8      # Speed multiplier when close to target
-        self.smooth_far_speed = 1.00       # Speed multiplier when far from target
-        self.smooth_acceleration = 1.15    # Acceleration curve strength
-        self.smooth_deceleration = 1.05    # Deceleration curve strength
-        self.smooth_fatigue_effect = 1.2   # How much fatigue affects shakiness
-        self.smooth_micro_corrections = 0  # Small random corrections (pixels)
+        # --- Smooth Aim (WindMouse Radiant Params) ---
+        self.smooth_gravity = 12.0
+        self.smooth_wind = 1.5
+        self.smooth_min_delay = 0.0
+        self.smooth_max_delay = 0.001
+        self.smooth_max_step = 45.0
+        self.smooth_min_step = 1.5
+        self.smooth_max_step_ratio = 0.22
+        self.smooth_target_area_ratio = 0.04
+        self.smooth_reaction_min = 0.03
+        self.smooth_reaction_max = 0.09
+        self.smooth_close_range = 30
+        self.smooth_far_range = 220
+        self.smooth_close_speed = 0.85
+        self.smooth_far_speed = 1.05
+        self.smooth_acceleration = 1.25
+        self.smooth_deceleration = 1.15
+        self.smooth_fatigue_effect = 0.2
+        self.smooth_micro_corrections = 0
 
         # --- Preview & HUD Overlays ---
         self.show_preview = True
