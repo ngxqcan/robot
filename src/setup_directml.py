@@ -19,21 +19,30 @@ if os.name == "nt":  # Windows
 else:  # macOS/Linux
     venv_python = os.path.join(VENV_DIR, "bin", "python")
 
+TRUSTED_HOSTS = [
+    "--trusted-host", "pypi.org",
+    "--trusted-host", "files.pythonhosted.org",
+    "--trusted-host", "download.pytorch.org"
+]
+
 # 3. Upgrade pip
 print("[*] Upgrading pip inside venv...")
-subprocess.check_call([venv_python, "-m", "pip", "install", "--upgrade", "pip"])
+try:
+    subprocess.check_call([venv_python, "-m", "pip", "install", "--upgrade", "pip"] + TRUSTED_HOSTS)
+except Exception as e:
+    print(f"[!] Warning: Failed to upgrade pip ({e}), continuing with installation...")
 
 # 4. Install requirements
 if os.path.isfile(REQUIREMENTS):
     print(f"[*] Installing from {REQUIREMENTS}...")
-    subprocess.check_call([venv_python, "-m", "pip", "install", "-r", REQUIREMENTS])
+    subprocess.check_call([venv_python, "-m", "pip", "install", "-r", REQUIREMENTS] + TRUSTED_HOSTS)
 else:
     packages = [
         "customtkinter", "opencv-python", "pyserial", "mss", "ultralytics==8.3.187",
         "onnx", "onnxruntime-directml", "cyndilib", "dxcam"
     ]
     print(f"[*] {REQUIREMENTS} not found. Installing default packages: {packages}")
-    subprocess.check_call([venv_python, "-m", "pip", "install"] + packages)
+    subprocess.check_call([venv_python, "-m", "pip", "install"] + packages + TRUSTED_HOSTS)
 
 # 5. Run patch.py using the venv's Python
 patch_script = os.path.join(os.path.dirname(__file__), "patch.py")
