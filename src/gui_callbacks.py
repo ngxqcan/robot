@@ -129,6 +129,11 @@ class GUICallbacks:
             try:
                 reload_model(path)
                 self.load_class_list()
+                if hasattr(self, "imgsz_slider"):
+                    self.imgsz_slider.set(config.imgsz)
+                if hasattr(self, "imgsz_value"):
+                    self.imgsz_value.configure(text=str(config.imgsz))
+                config.save()
             except Exception as e:
                 self.error_text.set(str(e))
         else:
@@ -138,6 +143,11 @@ class GUICallbacks:
         try:
             reload_model(config.model_path)
             self.load_class_list()
+            if hasattr(self, "imgsz_slider"):
+                self.imgsz_slider.set(config.imgsz)
+            if hasattr(self, "imgsz_value"):
+                self.imgsz_value.configure(text=str(config.imgsz))
+            config.save()
             self.error_text.set("")
         except Exception as e:
             self.error_text.set(str(e))

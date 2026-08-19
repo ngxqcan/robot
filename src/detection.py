@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import numpy as np
 from config import config
@@ -28,6 +29,55 @@ _class_names = {}
 _is_half = (DEVICE == 0)
 
 
+def get_model_native_imgsz(model, model_path=""):
+    """Extract native / expected image size from loaded model or filename."""
+    if model is None and not model_path:
+        return None
+
+    # 1. Try AutoBackend session inputs for ONNX / Engine
+    try:
+        if hasattr(model, "model") and hasattr(model.model, "session") and model.model.session is not None:
+            inputs = model.model.session.get_inputs()
+            if inputs and len(inputs) > 0:
+                shape = inputs[0].shape
+                if len(shape) >= 4 and isinstance(shape[2], int) and shape[2] > 0:
+                    return int(shape[2])
+    except Exception:
+        pass
+
+    # 2. Try AutoBackend imgsz attribute
+    try:
+        if hasattr(model, "model") and hasattr(model.model, "imgsz") and model.model.imgsz:
+            ims = model.model.imgsz
+            if isinstance(ims, (list, tuple)) and len(ims) > 0 and isinstance(ims[0], int) and ims[0] > 0:
+                return int(ims[0])
+            elif isinstance(ims, int) and ims > 0:
+                return int(ims)
+    except Exception:
+        pass
+
+    # 3. Try overrides
+    try:
+        if hasattr(model, "overrides") and model.overrides.get("imgsz"):
+            ims = model.overrides["imgsz"]
+            if isinstance(ims, (list, tuple)) and len(ims) > 0 and isinstance(ims[0], int) and ims[0] > 0:
+                return int(ims[0])
+            elif isinstance(ims, (int, float)) and ims > 0:
+                return int(ims)
+    except Exception:
+        pass
+
+    # 4. Check filename pattern like *_256.onnx, *_320.onnx, etc.
+    p = model_path or (getattr(model, "model_path", "") if hasattr(model, "model_path") else "")
+    if p:
+        base = os.path.basename(str(p))
+        match = re.search(r'[_x\-](128|160|192|224|256|288|320|384|416|480|512|576|640|736|800|960|1024|1280)\b', base)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
 def load_model(model_path=None):
     global _model, _class_names, _is_half
     if model_path is None:
@@ -54,15 +104,22 @@ def load_model(model_path=None):
         config.model_file_size = os.path.getsize(model_path) if os.path.exists(model_path) else 0
         config.model_load_error = ""
 
+        # Auto-detect and sync imgsz for fixed-dimension models (e.g. 256x256 ONNX)
+        detected_size = get_model_native_imgsz(_model, model_path)
+        if detected_size is not None and detected_size > 0:
+            config.imgsz = detected_size
+            print(f"[INFO] Auto-detected model input resolution: {config.imgsz}x{config.imgsz}")
+
         # Model GPU Warm-up pass to eliminate first-frame latency stutter
         try:
-            dummy_img = np.zeros((config.imgsz, config.imgsz, 3), dtype=np.uint8)
+            target_size = detected_size or config.imgsz
+            dummy_img = np.zeros((target_size, target_size, 3), dtype=np.uint8)
             _is_half = bool(DEVICE == 0 and not str(model_path).endswith(".onnx"))
             if TORCH_AVAILABLE:
                 with torch.inference_mode():
                     _model.predict(
                         source=dummy_img,
-                        imgsz=config.imgsz,
+                        imgsz=target_size,
                         device=DEVICE,
                         half=_is_half,
                         verbose=False,
@@ -71,13 +128,13 @@ def load_model(model_path=None):
             else:
                 _model.predict(
                     source=dummy_img,
-                    imgsz=config.imgsz,
+                    imgsz=target_size,
                     device=DEVICE,
                     verbose=False,
                     conf=0.25
                 )
-        except Exception:
-            pass
+        except Exception as warmup_err:
+            print(f"[WARN] Model warm-up skipped: {warmup_err}")
 
         return _model, _class_names
 
@@ -99,13 +156,18 @@ def perform_detection(model, image):
     if model is None or image is None:
         return None
 
+    target_imgsz = getattr(config, "imgsz", 640)
+    native_size = get_model_native_imgsz(model)
+    if native_size is not None and native_size > 0:
+        target_imgsz = native_size
+
     t0 = time.perf_counter()
     try:
         if TORCH_AVAILABLE:
             with torch.inference_mode():
                 results = model.predict(
                     source=image,
-                    imgsz=config.imgsz,
+                    imgsz=target_imgsz,
                     stream=True,
                     conf=config.conf,
                     iou=0.45,
@@ -126,7 +188,7 @@ def perform_detection(model, image):
         else:
             results = model.predict(
                 source=image,
-                imgsz=config.imgsz,
+                imgsz=target_imgsz,
                 stream=True,
                 conf=config.conf,
                 iou=0.45,
@@ -147,7 +209,7 @@ def perform_detection(model, image):
         t1 = time.perf_counter()
         config.detection_latency = (t1 - t0) * 1000.0
         return results
-    except Exception:
+    except Exception as e:
         return None
 
 

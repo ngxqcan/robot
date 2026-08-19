@@ -312,7 +312,7 @@ class CapkfaPlusGUI(ctk.CTk):
         card.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(card, text="🎮 Aiming & Anti-Shake Smooth", font=("Segoe UI", 14, "bold"), text_color=NEON_GREEN)\
-            .grid(row=0, column=0, columnspan=3, padx=15, pady=(12, 10), sticky="w")
+            .grid(row=0, column=0, columnspan=2, padx=15, pady=(12, 10), sticky="w")
 
         # Aim Mode Dropdown
         ctk.CTkLabel(card, text="Aim Algorithm", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
@@ -321,59 +321,53 @@ class CapkfaPlusGUI(ctk.CTk):
             card, values=["normal", "bezier", "silent", "smooth"], variable=self.mode_var,
             command=self.update_mode, width=150, fg_color="#20222b", button_color="#282a36"
         )
-        self.mode_menu.grid(row=1, column=1, columnspan=2, padx=15, pady=6, sticky="e")
+        self.mode_menu.grid(row=1, column=1, padx=15, pady=6, sticky="e")
 
-        # FOV Size Slider
+        # FOV Size
         ctk.CTkLabel(card, text="FOV Region Size", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=2, column=0, padx=15, pady=6, sticky="w")
-        self.fov_slider = ctk.CTkSlider(card, from_=50, to=400, number_of_steps=175, command=self.update_fov)
-        self.fov_slider.grid(row=2, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.fov_entry = ctk.CTkEntry(card, width=50, justify="center")
-        self.fov_entry.grid(row=2, column=2, padx=(0, 15), pady=6)
+        self.fov_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.fov_entry.grid(row=2, column=1, padx=15, pady=6, sticky="e")
         self.fov_entry.bind("<Return>", self.on_fov_entry_commit)
         self.fov_entry.bind("<FocusOut>", self.on_fov_entry_commit)
 
         # In-Game Sensitivity
         ctk.CTkLabel(card, text="In-Game Sensitivity", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=3, column=0, padx=15, pady=6, sticky="w")
-        self.sens_slider = ctk.CTkSlider(card, from_=0.1, to=10.0, number_of_steps=99, command=self.update_in_game_sens)
-        self.sens_slider.grid(row=3, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.sens_entry = ctk.CTkEntry(card, width=50, justify="center")
-        self.sens_entry.grid(row=3, column=2, padx=(0, 15), pady=6)
+        self.sens_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.sens_entry.grid(row=3, column=1, padx=15, pady=6, sticky="e")
         self.sens_entry.bind("<Return>", self.on_sens_entry_commit)
         self.sens_entry.bind("<FocusOut>", self.on_sens_entry_commit)
 
         # Anti-Shake Deadzone (px)
         ctk.CTkLabel(card, text="Anti-Shake Deadzone (px)", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=4, column=0, padx=15, pady=6, sticky="w")
-        self.deadzone_slider = ctk.CTkSlider(card, from_=0.0, to=8.0, number_of_steps=80, command=self.update_deadzone)
-        self.deadzone_slider.set(getattr(config, "aim_deadzone", 2.0))
-        self.deadzone_slider.grid(row=4, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.deadzone_label = ctk.CTkLabel(card, text=f"{getattr(config, 'aim_deadzone', 2.0):.1f}", font=("Segoe UI", 12, "bold"), text_color=NEON_CYAN, width=50)
-        self.deadzone_label.grid(row=4, column=2, padx=(0, 15), pady=6)
+        self.deadzone_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.deadzone_entry.grid(row=4, column=1, padx=15, pady=6, sticky="e")
+        self.deadzone_entry.bind("<Return>", self.on_deadzone_entry_commit)
+        self.deadzone_entry.bind("<FocusOut>", self.on_deadzone_entry_commit)
 
         # Anti-Shake EMA Smoothing
         ctk.CTkLabel(card, text="Target EMA Smooth Filter", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=5, column=0, padx=15, pady=6, sticky="w")
-        self.smoothing_slider = ctk.CTkSlider(card, from_=0.0, to=0.95, number_of_steps=95, command=self.update_smoothing)
-        self.smoothing_slider.set(getattr(config, "aim_smoothing_factor", 0.60))
-        self.smoothing_slider.grid(row=5, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.smoothing_label = ctk.CTkLabel(card, text=f"{getattr(config, 'aim_smoothing_factor', 0.60):.2f}", font=("Segoe UI", 12, "bold"), text_color=NEON_CYAN, width=50)
-        self.smoothing_label.grid(row=5, column=2, padx=(0, 15), pady=6)
+        self.smoothing_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.smoothing_entry.grid(row=5, column=1, padx=15, pady=6, sticky="e")
+        self.smoothing_entry.bind("<Return>", self.on_smoothing_entry_commit)
+        self.smoothing_entry.bind("<FocusOut>", self.on_smoothing_entry_commit)
 
         # Player Y Offset
         ctk.CTkLabel(card, text="Player Y-Offset", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=6, column=0, padx=15, pady=6, sticky="w")
-        self.offset_slider = ctk.CTkSlider(card, from_=-20, to=30, number_of_steps=50, command=self.update_offset)
-        self.offset_slider.grid(row=6, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.offset_label = ctk.CTkLabel(card, text=str(config.player_y_offset), font=("Segoe UI", 12, "bold"), text_color=NEON_CYAN, width=50)
-        self.offset_label.grid(row=6, column=2, padx=(0, 15), pady=6)
+        self.offset_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.offset_entry.grid(row=6, column=1, padx=15, pady=6, sticky="e")
+        self.offset_entry.bind("<Return>", self.on_offset_entry_commit)
+        self.offset_entry.bind("<FocusOut>", self.on_offset_entry_commit)
 
         # Aim Activation Button
         ctk.CTkLabel(card, text="Activation Button", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=7, column=0, padx=15, pady=(6, 12), sticky="w")
         btn_frame = ctk.CTkFrame(card, fg_color="transparent")
-        btn_frame.grid(row=7, column=1, columnspan=2, padx=15, pady=(6, 12), sticky="e")
+        btn_frame.grid(row=7, column=1, padx=15, pady=(6, 12), sticky="e")
 
         self.btn_menu = ctk.CTkOptionMenu(
             btn_frame, values=["Left (0)", "Right (1)", "Middle (2)", "Side 4 (3)", "Side 5 (4)"],
@@ -392,34 +386,32 @@ class CapkfaPlusGUI(ctk.CTk):
 
         # Header + Switch
         hdr = ctk.CTkFrame(card, fg_color="transparent")
-        hdr.grid(row=0, column=0, columnspan=3, padx=15, pady=(12, 10), sticky="ew")
+        hdr.grid(row=0, column=0, columnspan=2, padx=15, pady=(12, 10), sticky="ew")
         ctk.CTkLabel(hdr, text="🔫 Recoil Control System (RCS)", font=("Segoe UI", 14, "bold"), text_color=NEON_ORANGE).pack(side="left")
         ctk.CTkSwitch(hdr, text="Enable RCS", variable=self.rcs_enabled_var, command=self.on_rcs_toggle, text_color=TEXT_LIGHT).pack(side="right")
 
         # Vertical Recoil (Pull Down)
         ctk.CTkLabel(card, text="Vertical Pull Strength", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=1, column=0, padx=15, pady=6, sticky="w")
-        self.rcs_y_slider = ctk.CTkSlider(card, from_=0.0, to=15.0, number_of_steps=150, command=self.update_rcs_y)
-        self.rcs_y_slider.set(getattr(config, "rcs_strength_y", 2.8))
-        self.rcs_y_slider.grid(row=1, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.rcs_y_lbl = ctk.CTkLabel(card, text=f"{getattr(config, 'rcs_strength_y', 2.8):.1f}", font=("Segoe UI", 12, "bold"), text_color=NEON_ORANGE, width=50)
-        self.rcs_y_lbl.grid(row=1, column=2, padx=(0, 15), pady=6)
+        self.rcs_y_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.rcs_y_entry.grid(row=1, column=1, padx=15, pady=6, sticky="e")
+        self.rcs_y_entry.bind("<Return>", self.on_rcs_y_entry_commit)
+        self.rcs_y_entry.bind("<FocusOut>", self.on_rcs_y_entry_commit)
 
         # Horizontal Recoil (Compensate X)
         ctk.CTkLabel(card, text="Horizontal Compensation", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=2, column=0, padx=15, pady=6, sticky="w")
-        self.rcs_x_slider = ctk.CTkSlider(card, from_=-5.0, to=5.0, number_of_steps=100, command=self.update_rcs_x)
-        self.rcs_x_slider.set(getattr(config, "rcs_strength_x", 0.0))
-        self.rcs_x_slider.grid(row=2, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.rcs_x_lbl = ctk.CTkLabel(card, text=f"{getattr(config, 'rcs_strength_x', 0.0):.1f}", font=("Segoe UI", 12, "bold"), text_color=NEON_ORANGE, width=50)
-        self.rcs_x_lbl.grid(row=2, column=2, padx=(0, 15), pady=6)
+        self.rcs_x_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.rcs_x_entry.grid(row=2, column=1, padx=15, pady=6, sticky="e")
+        self.rcs_x_entry.bind("<Return>", self.on_rcs_x_entry_commit)
+        self.rcs_x_entry.bind("<FocusOut>", self.on_rcs_x_entry_commit)
 
         # RCS Activation Delay (ms)
         ctk.CTkLabel(card, text="RCS Start Delay (ms)", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=3, column=0, padx=15, pady=(6, 12), sticky="w")
-        self.rcs_delay_entry = ctk.CTkEntry(card, width=70, justify="center")
-        self.rcs_delay_entry.insert(0, str(getattr(config, "rcs_delay_ms", 45)))
-        self.rcs_delay_entry.grid(row=3, column=1, columnspan=2, padx=15, pady=(6, 12), sticky="e")
+        self.rcs_delay_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.rcs_delay_entry.grid(row=3, column=1, padx=15, pady=(6, 12), sticky="e")
+        self.rcs_delay_entry.bind("<Return>", self.save_rcs_params)
         self.rcs_delay_entry.bind("<FocusOut>", self.save_rcs_params)
 
     # ---------------- Card: Dynamic Mode Settings ----------------
@@ -435,55 +427,55 @@ class CapkfaPlusGUI(ctk.CTk):
 
         mode = config.mode.lower()
         ctk.CTkLabel(self.dynamic_frame, text=f"⚙️ {mode.capitalize()} Mode Parameters", font=("Segoe UI", 14, "bold"), text_color=NEON_CYAN)\
-            .grid(row=0, column=0, columnspan=3, padx=15, pady=(12, 10), sticky="w")
+            .grid(row=0, column=0, columnspan=2, padx=15, pady=(12, 10), sticky="w")
 
         if mode == "normal":
             ctk.CTkLabel(self.dynamic_frame, text="Speed X", text_color=TEXT_LIGHT).grid(row=1, column=0, padx=15, pady=6, sticky="w")
-            self.normal_x_slider = ctk.CTkSlider(self.dynamic_frame, from_=0.05, to=2.0, command=self.update_normal_x)
-            self.normal_x_slider.set(config.normal_x_speed)
-            self.normal_x_slider.grid(row=1, column=1, padx=(5, 10), pady=6, sticky="ew")
-            self.normal_x_label = ctk.CTkLabel(self.dynamic_frame, text=f"{config.normal_x_speed:.2f}", text_color=NEON_CYAN, width=50)
-            self.normal_x_label.grid(row=1, column=2, padx=(0, 15), pady=6)
+            self.normal_x_entry = ctk.CTkEntry(self.dynamic_frame, width=80, justify="center")
+            self.normal_x_entry.insert(0, f"{config.normal_x_speed:.2f}")
+            self.normal_x_entry.grid(row=1, column=1, padx=15, pady=6, sticky="e")
+            self.normal_x_entry.bind("<Return>", self.on_normal_x_commit)
+            self.normal_x_entry.bind("<FocusOut>", self.on_normal_x_commit)
 
             ctk.CTkLabel(self.dynamic_frame, text="Speed Y", text_color=TEXT_LIGHT).grid(row=2, column=0, padx=15, pady=(6, 12), sticky="w")
-            self.normal_y_slider = ctk.CTkSlider(self.dynamic_frame, from_=0.05, to=2.0, command=self.update_normal_y)
-            self.normal_y_slider.set(config.normal_y_speed)
-            self.normal_y_slider.grid(row=2, column=1, padx=(5, 10), pady=(6, 12), sticky="ew")
-            self.normal_y_label = ctk.CTkLabel(self.dynamic_frame, text=f"{config.normal_y_speed:.2f}", text_color=NEON_CYAN, width=50)
-            self.normal_y_label.grid(row=2, column=2, padx=(0, 15), pady=(6, 12))
+            self.normal_y_entry = ctk.CTkEntry(self.dynamic_frame, width=80, justify="center")
+            self.normal_y_entry.insert(0, f"{config.normal_y_speed:.2f}")
+            self.normal_y_entry.grid(row=2, column=1, padx=15, pady=(6, 12), sticky="e")
+            self.normal_y_entry.bind("<Return>", self.on_normal_y_commit)
+            self.normal_y_entry.bind("<FocusOut>", self.on_normal_y_commit)
 
         elif mode in ("bezier", "silent"):
             is_silent = (mode == "silent")
-            ctk.CTkLabel(self.dynamic_frame, text="Segments", text_color=TEXT_LIGHT).grid(row=1, column=0, padx=15, pady=6, sticky="w")
             seg_val = config.silent_segments if is_silent else config.bezier_segments
-            self.bez_seg_slider = ctk.CTkSlider(self.dynamic_frame, from_=2, to=30, number_of_steps=28, command=lambda v: self.update_bezier_param('seg', v, is_silent))
-            self.bez_seg_slider.set(seg_val)
-            self.bez_seg_slider.grid(row=1, column=1, padx=(5, 10), pady=6, sticky="ew")
-            self.bez_seg_lbl = ctk.CTkLabel(self.dynamic_frame, text=str(seg_val), text_color=NEON_CYAN, width=50)
-            self.bez_seg_lbl.grid(row=1, column=2, padx=(0, 15), pady=6)
+            ctk.CTkLabel(self.dynamic_frame, text="Segments", text_color=TEXT_LIGHT).grid(row=1, column=0, padx=15, pady=6, sticky="w")
+            self.bez_seg_entry = ctk.CTkEntry(self.dynamic_frame, width=80, justify="center")
+            self.bez_seg_entry.insert(0, str(seg_val))
+            self.bez_seg_entry.grid(row=1, column=1, padx=15, pady=6, sticky="e")
+            self.bez_seg_entry.bind("<Return>", lambda e, s=is_silent: self.on_bez_seg_commit(s))
+            self.bez_seg_entry.bind("<FocusOut>", lambda e, s=is_silent: self.on_bez_seg_commit(s))
 
-            ctk.CTkLabel(self.dynamic_frame, text="Curve Strength", text_color=TEXT_LIGHT).grid(row=2, column=0, padx=15, pady=(6, 12), sticky="w")
             ctrl_val = config.silent_ctrl_x if is_silent else config.bezier_ctrl_x
-            self.bez_ctrl_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=50, number_of_steps=49, command=lambda v: self.update_bezier_param('ctrl', v, is_silent))
-            self.bez_ctrl_slider.set(ctrl_val)
-            self.bez_ctrl_slider.grid(row=2, column=1, padx=(5, 10), pady=(6, 12), sticky="ew")
-            self.bez_ctrl_lbl = ctk.CTkLabel(self.dynamic_frame, text=str(ctrl_val), text_color=NEON_CYAN, width=50)
-            self.bez_ctrl_lbl.grid(row=2, column=2, padx=(0, 15), pady=(6, 12))
+            ctk.CTkLabel(self.dynamic_frame, text="Curve Strength", text_color=TEXT_LIGHT).grid(row=2, column=0, padx=15, pady=(6, 12), sticky="w")
+            self.bez_ctrl_entry = ctk.CTkEntry(self.dynamic_frame, width=80, justify="center")
+            self.bez_ctrl_entry.insert(0, str(ctrl_val))
+            self.bez_ctrl_entry.grid(row=2, column=1, padx=15, pady=(6, 12), sticky="e")
+            self.bez_ctrl_entry.bind("<Return>", lambda e, s=is_silent: self.on_bez_ctrl_commit(s))
+            self.bez_ctrl_entry.bind("<FocusOut>", lambda e, s=is_silent: self.on_bez_ctrl_commit(s))
 
         elif mode == "smooth":
             ctk.CTkLabel(self.dynamic_frame, text="Gravity", text_color=TEXT_LIGHT).grid(row=1, column=0, padx=15, pady=6, sticky="w")
-            self.smooth_grav_slider = ctk.CTkSlider(self.dynamic_frame, from_=1.0, to=20.0, command=self.update_smooth_gravity)
-            self.smooth_grav_slider.set(config.smooth_gravity)
-            self.smooth_grav_slider.grid(row=1, column=1, padx=(5, 10), pady=6, sticky="ew")
-            self.smooth_grav_lbl = ctk.CTkLabel(self.dynamic_frame, text=f"{config.smooth_gravity:.1f}", text_color=NEON_CYAN, width=50)
-            self.smooth_grav_lbl.grid(row=1, column=2, padx=(0, 15), pady=6)
+            self.smooth_grav_entry = ctk.CTkEntry(self.dynamic_frame, width=80, justify="center")
+            self.smooth_grav_entry.insert(0, f"{config.smooth_gravity:.1f}")
+            self.smooth_grav_entry.grid(row=1, column=1, padx=15, pady=6, sticky="e")
+            self.smooth_grav_entry.bind("<Return>", self.on_smooth_grav_commit)
+            self.smooth_grav_entry.bind("<FocusOut>", self.on_smooth_grav_commit)
 
             ctk.CTkLabel(self.dynamic_frame, text="Wind Randomness", text_color=TEXT_LIGHT).grid(row=2, column=0, padx=15, pady=(6, 12), sticky="w")
-            self.smooth_wind_slider = ctk.CTkSlider(self.dynamic_frame, from_=0.0, to=15.0, command=self.update_smooth_wind)
-            self.smooth_wind_slider.set(config.smooth_wind)
-            self.smooth_wind_slider.grid(row=2, column=1, padx=(5, 10), pady=6, sticky="ew")
-            self.smooth_wind_lbl = ctk.CTkLabel(self.dynamic_frame, text=f"{config.smooth_wind:.1f}", text_color=NEON_CYAN, width=50)
-            self.smooth_wind_lbl.grid(row=2, column=2, padx=(0, 15), pady=(6, 12))
+            self.smooth_wind_entry = ctk.CTkEntry(self.dynamic_frame, width=80, justify="center")
+            self.smooth_wind_entry.insert(0, f"{config.smooth_wind:.1f}")
+            self.smooth_wind_entry.grid(row=2, column=1, padx=15, pady=(6, 12), sticky="e")
+            self.smooth_wind_entry.bind("<Return>", self.on_smooth_wind_commit)
+            self.smooth_wind_entry.bind("<FocusOut>", self.on_smooth_wind_commit)
 
     # ---------------- Card: AI Model & Detection ----------------
     def build_card_model_and_classes(self, parent, row):
@@ -492,14 +484,14 @@ class CapkfaPlusGUI(ctk.CTk):
         card.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(card, text="🎯 AI Model & Detection", font=("Segoe UI", 14, "bold"), text_color=NEON_ORANGE)\
-            .grid(row=0, column=0, columnspan=3, padx=15, pady=(12, 10), sticky="w")
+            .grid(row=0, column=0, columnspan=2, padx=15, pady=(12, 10), sticky="w")
 
         # Model Selector
         ctk.CTkLabel(card, text="Select Model", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=1, column=0, padx=15, pady=6, sticky="w")
         
         m_frame = ctk.CTkFrame(card, fg_color="transparent")
-        m_frame.grid(row=1, column=1, columnspan=2, padx=15, pady=6, sticky="ew")
+        m_frame.grid(row=1, column=1, padx=15, pady=6, sticky="ew")
         m_frame.grid_columnconfigure(0, weight=1)
 
         self.model_menu = ctk.CTkOptionMenu(
@@ -518,7 +510,7 @@ class CapkfaPlusGUI(ctk.CTk):
             card, values=["Loading..."], command=self.select_player_class,
             fg_color="#20222b", button_color="#282a36"
         )
-        self.player_class_menu.grid(row=2, column=1, columnspan=2, padx=15, pady=6, sticky="ew")
+        self.player_class_menu.grid(row=2, column=1, padx=15, pady=6, sticky="ew")
 
         ctk.CTkLabel(card, text="Head Class", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=3, column=0, padx=15, pady=6, sticky="w")
@@ -526,29 +518,25 @@ class CapkfaPlusGUI(ctk.CTk):
             card, values=["Loading..."], command=self.select_head_class,
             fg_color="#20222b", button_color="#282a36"
         )
-        self.head_class_menu.grid(row=3, column=1, columnspan=2, padx=15, pady=6, sticky="ew")
+        self.head_class_menu.grid(row=3, column=1, padx=15, pady=6, sticky="ew")
 
         # Head Priority Switch
         ctk.CTkSwitch(card, text="Headshot Priority (Prioritize Head over Body)", variable=self.head_priority_var, command=self.on_head_priority_toggle, text_color=TEXT_LIGHT)\
-            .grid(row=4, column=0, columnspan=3, padx=15, pady=6, sticky="w")
+            .grid(row=4, column=0, columnspan=2, padx=15, pady=6, sticky="w")
 
         # Confidence Threshold
         ctk.CTkLabel(card, text="Confidence Threshold", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=5, column=0, padx=15, pady=6, sticky="w")
-        self.conf_slider = ctk.CTkSlider(card, from_=0.05, to=0.95, number_of_steps=90, command=self.update_conf)
-        self.conf_slider.grid(row=5, column=1, padx=(5, 10), pady=6, sticky="ew")
-        self.conf_entry = ctk.CTkEntry(card, width=50, justify="center")
-        self.conf_entry.grid(row=5, column=2, padx=(0, 15), pady=6)
+        self.conf_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.conf_entry.grid(row=5, column=1, padx=15, pady=6, sticky="e")
         self.conf_entry.bind("<Return>", self.on_conf_entry_commit)
         self.conf_entry.bind("<FocusOut>", self.on_conf_entry_commit)
 
-        # Resolution (imgsz) & Max Detections
+        # Resolution (imgsz)
         ctk.CTkLabel(card, text="Detection Resolution", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=6, column=0, padx=15, pady=(6, 12), sticky="w")
-        self.imgsz_slider = ctk.CTkSlider(card, from_=256, to=1024, number_of_steps=12, command=self.update_imgsz)
-        self.imgsz_slider.grid(row=6, column=1, padx=(5, 10), pady=(6, 12), sticky="ew")
-        self.imgsz_entry = ctk.CTkEntry(card, width=50, justify="center")
-        self.imgsz_entry.grid(row=6, column=2, padx=(0, 15), pady=(6, 12))
+        self.imgsz_entry = ctk.CTkEntry(card, width=80, justify="center")
+        self.imgsz_entry.grid(row=6, column=1, padx=15, pady=(6, 12), sticky="e")
         self.imgsz_entry.bind("<Return>", self.on_imgsz_entry_commit)
         self.imgsz_entry.bind("<FocusOut>", self.on_imgsz_entry_commit)
 
@@ -750,32 +738,18 @@ class CapkfaPlusGUI(ctk.CTk):
     # CALLBACKS & ACTIONS
     # =========================================================================
     def refresh_all(self):
-        self.fov_slider.set(config.region_size)
         self._set_entry_text(self.fov_entry, str(config.region_size))
-        
-        self.sens_slider.set(config.in_game_sens)
         self._set_entry_text(self.sens_entry, f"{config.in_game_sens:.2f}")
-
-        self.deadzone_slider.set(getattr(config, "aim_deadzone", 2.0))
-        self.deadzone_label.configure(text=f"{getattr(config, 'aim_deadzone', 2.0):.1f}")
-
-        self.smoothing_slider.set(getattr(config, "aim_smoothing_factor", 0.60))
-        self.smoothing_label.configure(text=f"{getattr(config, 'aim_smoothing_factor', 0.60):.2f}")
-
-        self.offset_slider.set(config.player_y_offset)
-        self.offset_label.configure(text=str(config.player_y_offset))
+        self._set_entry_text(self.deadzone_entry, f"{getattr(config, 'aim_deadzone', 2.0):.1f}")
+        self._set_entry_text(self.smoothing_entry, f"{getattr(config, 'aim_smoothing_factor', 0.60):.2f}")
+        self._set_entry_text(self.offset_entry, str(config.player_y_offset))
 
         self.rcs_enabled_var.set(bool(getattr(config, "rcs_enabled", False)))
-        self.rcs_y_slider.set(getattr(config, "rcs_strength_y", 2.8))
-        self.rcs_y_lbl.configure(text=f"{getattr(config, 'rcs_strength_y', 2.8):.1f}")
-        self.rcs_x_slider.set(getattr(config, "rcs_strength_x", 0.0))
-        self.rcs_x_lbl.configure(text=f"{getattr(config, 'rcs_strength_x', 0.0):.1f}")
+        self._set_entry_text(self.rcs_y_entry, f"{getattr(config, 'rcs_strength_y', 2.8):.1f}")
+        self._set_entry_text(self.rcs_x_entry, f"{getattr(config, 'rcs_strength_x', 0.0):.1f}")
         self._set_entry_text(self.rcs_delay_entry, str(getattr(config, "rcs_delay_ms", 45)))
 
-        self.conf_slider.set(config.conf)
         self._set_entry_text(self.conf_entry, f"{config.conf:.2f}")
-
-        self.imgsz_slider.set(config.imgsz)
         self._set_entry_text(self.imgsz_entry, str(config.imgsz))
 
         self.btn_var.set(config.selected_mouse_button)
@@ -803,6 +777,7 @@ class CapkfaPlusGUI(ctk.CTk):
         self._set_entry_text(self.tb_delay_entry, str(getattr(config, "trigger_delay_ms", 25)))
         self._set_entry_text(self.tb_cd_entry, str(getattr(config, "trigger_cooldown_ms", 120)))
 
+        self.resolution_var.set(f"{config.region_size}x{config.region_size}")
         self.load_class_list()
         self.update_dynamic_frame()
 
@@ -868,152 +843,181 @@ class CapkfaPlusGUI(ctk.CTk):
             config.ndi_selected_source = val
             config.save()
 
-    def update_fov(self, val):
-        if getattr(self, "_updating_fov", False): return
-        self._updating_fov = True
-        try:
-            val = int(round(val))
-            config.region_size = val
-            self._set_entry_text(self.fov_entry, str(val))
-            self.resolution_var.set(f"{val}x{val}")
-        finally:
-            self._updating_fov = False
-
     def on_fov_entry_commit(self, event=None):
         try:
             val = int(self.fov_entry.get().strip())
-            val = max(32, min(800, val))
-            config.region_size = val
-            self.fov_slider.set(val)
-            self.resolution_var.set(f"{val}x{val}")
+            config.region_size = max(10, min(1000, val))
+            self.resolution_var.set(f"{config.region_size}x{config.region_size}")
+            config.save()
         except Exception:
-            self._set_entry_text(self.fov_entry, str(config.region_size))
-
-    def update_in_game_sens(self, val):
-        config.in_game_sens = round(float(val), 2)
-        self._set_entry_text(self.sens_entry, f"{config.in_game_sens:.2f}")
+            pass
+        self._set_entry_text(self.fov_entry, str(config.region_size))
 
     def on_sens_entry_commit(self, event=None):
         try:
             val = float(self.sens_entry.get().strip())
-            config.in_game_sens = max(0.05, min(20.0, val))
-            self.sens_slider.set(config.in_game_sens)
+            config.in_game_sens = max(0.01, min(50.0, val))
+            config.save()
         except Exception:
-            self._set_entry_text(self.sens_entry, f"{config.in_game_sens:.2f}")
+            pass
+        self._set_entry_text(self.sens_entry, f"{config.in_game_sens:.2f}")
 
-    def update_deadzone(self, val):
-        config.aim_deadzone = round(float(val), 1)
-        self.deadzone_label.configure(text=f"{config.aim_deadzone:.1f}")
+    def on_deadzone_entry_commit(self, event=None):
+        try:
+            val = float(self.deadzone_entry.get().strip())
+            config.aim_deadzone = max(0.0, min(50.0, val))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.deadzone_entry, f"{getattr(config, 'aim_deadzone', 2.0):.1f}")
 
-    def update_smoothing(self, val):
-        config.aim_smoothing_factor = round(float(val), 2)
-        self.smoothing_label.configure(text=f"{config.aim_smoothing_factor:.2f}")
+    def on_smoothing_entry_commit(self, event=None):
+        try:
+            val = float(self.smoothing_entry.get().strip())
+            config.aim_smoothing_factor = max(0.0, min(0.99, val))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.smoothing_entry, f"{getattr(config, 'aim_smoothing_factor', 0.60):.2f}")
 
-    def on_rcs_toggle(self):
-        config.rcs_enabled = bool(self.rcs_enabled_var.get())
+    def on_offset_entry_commit(self, event=None):
+        try:
+            val = int(self.offset_entry.get().strip())
+            config.player_y_offset = max(-200, min(200, val))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.offset_entry, str(config.player_y_offset))
 
-    def update_rcs_y(self, val):
-        config.rcs_strength_y = round(float(val), 1)
-        self.rcs_y_lbl.configure(text=f"{config.rcs_strength_y:.1f}")
+    def on_rcs_y_entry_commit(self, event=None):
+        try:
+            val = float(self.rcs_y_entry.get().strip())
+            config.rcs_strength_y = max(0.0, min(50.0, val))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.rcs_y_entry, f"{getattr(config, 'rcs_strength_y', 2.8):.1f}")
 
-    def update_rcs_x(self, val):
-        config.rcs_strength_x = round(float(val), 1)
-        self.rcs_x_lbl.configure(text=f"{config.rcs_strength_x:.1f}")
+    def on_rcs_x_entry_commit(self, event=None):
+        try:
+            val = float(self.rcs_x_entry.get().strip())
+            config.rcs_strength_x = max(-50.0, min(50.0, val))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.rcs_x_entry, f"{getattr(config, 'rcs_strength_x', 0.0):.1f}")
 
     def save_rcs_params(self, event=None):
         try:
-            config.rcs_delay_ms = int(self.rcs_delay_entry.get().strip())
+            config.rcs_delay_ms = max(0, min(5000, int(self.rcs_delay_entry.get().strip())))
+            config.save()
         except Exception:
             pass
-
-    def update_offset(self, val):
-        val = int(round(val))
-        config.player_y_offset = val
-        self.offset_label.configure(text=str(val))
+        self._set_entry_text(self.rcs_delay_entry, str(getattr(config, "rcs_delay_ms", 45)))
 
     def update_mouse_btn(self, val):
         config.selected_mouse_button = self._mouse_str_to_idx(val)
+        config.save()
 
     def on_always_on_toggle(self):
         config.always_on_aim = bool(self.always_on_var.get())
+        config.save()
 
     def on_head_priority_toggle(self):
         config.head_priority = bool(self.head_priority_var.get())
+        config.save()
 
     def on_button_mask_toggle(self):
         config.button_mask = bool(self.button_mask_var.get())
+        config.save()
 
     def on_debug_toggle(self):
         config.show_debug_window = bool(self.debug_checkbox_var.get())
         if not config.show_debug_window:
             try: cv2.destroyWindow("CapkfaPlus Live Debug")
             except Exception: pass
+        config.save()
 
     def update_mode(self, val):
         config.mode = str(val).lower()
         self.update_dynamic_frame()
+        config.save()
 
-    def update_normal_x(self, val):
-        config.normal_x_speed = round(float(val), 2)
-        self.normal_x_label.configure(text=f"{config.normal_x_speed:.2f}")
-
-    def update_normal_y(self, val):
-        config.normal_y_speed = round(float(val), 2)
-        self.normal_y_label.configure(text=f"{config.normal_y_speed:.2f}")
-
-    def update_bezier_param(self, param, val, is_silent=False):
-        val = int(round(float(val)))
-        if param == 'seg':
-            if is_silent: config.silent_segments = val
-            else: config.bezier_segments = val
-            self.bez_seg_lbl.configure(text=str(val))
-        else:
-            if is_silent: config.silent_ctrl_x = config.silent_ctrl_y = val
-            else: config.bezier_ctrl_x = config.bezier_ctrl_y = val
-            self.bez_ctrl_lbl.configure(text=str(val))
-
-    def update_smooth_gravity(self, val):
-        config.smooth_gravity = round(float(val), 1)
-        self.smooth_grav_lbl.configure(text=f"{config.smooth_gravity:.1f}")
-
-    def update_smooth_wind(self, val):
-        config.smooth_wind = round(float(val), 1)
-        self.smooth_wind_lbl.configure(text=f"{config.smooth_wind:.1f}")
-
-    def update_conf(self, val):
-        if getattr(self, "_updating_conf", False): return
-        self._updating_conf = True
+    def on_normal_x_commit(self, event=None):
         try:
-            config.conf = round(float(val), 2)
-            self._set_entry_text(self.conf_entry, f"{config.conf:.2f}")
-        finally:
-            self._updating_conf = False
+            config.normal_x_speed = max(0.01, min(10.0, float(self.normal_x_entry.get().strip())))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.normal_x_entry, f"{config.normal_x_speed:.2f}")
+
+    def on_normal_y_commit(self, event=None):
+        try:
+            config.normal_y_speed = max(0.01, min(10.0, float(self.normal_y_entry.get().strip())))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.normal_y_entry, f"{config.normal_y_speed:.2f}")
+
+    def on_bez_seg_commit(self, is_silent=False, event=None):
+        try:
+            val = max(1, min(100, int(self.bez_seg_entry.get().strip())))
+            if is_silent:
+                config.silent_segments = val
+            else:
+                config.bezier_segments = val
+            config.save()
+        except Exception:
+            pass
+        val = config.silent_segments if is_silent else config.bezier_segments
+        self._set_entry_text(self.bez_seg_entry, str(val))
+
+    def on_bez_ctrl_commit(self, is_silent=False, event=None):
+        try:
+            val = max(0.0, min(200.0, float(self.bez_ctrl_entry.get().strip())))
+            if is_silent:
+                config.silent_ctrl_x = config.silent_ctrl_y = val
+            else:
+                config.bezier_ctrl_x = config.bezier_ctrl_y = val
+            config.save()
+        except Exception:
+            pass
+        val = config.silent_ctrl_x if is_silent else config.bezier_ctrl_x
+        self._set_entry_text(self.bez_ctrl_entry, str(int(val) if float(val).is_integer() else f"{val:.1f}"))
+
+    def on_smooth_grav_commit(self, event=None):
+        try:
+            config.smooth_gravity = max(0.1, min(50.0, float(self.smooth_grav_entry.get().strip())))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.smooth_grav_entry, f"{config.smooth_gravity:.1f}")
+
+    def on_smooth_wind_commit(self, event=None):
+        try:
+            config.smooth_wind = max(0.0, min(50.0, float(self.smooth_wind_entry.get().strip())))
+            config.save()
+        except Exception:
+            pass
+        self._set_entry_text(self.smooth_wind_entry, f"{config.smooth_wind:.1f}")
 
     def on_conf_entry_commit(self, event=None):
         try:
             val = float(self.conf_entry.get().strip())
-            config.conf = max(0.01, min(0.99, val))
-            self.conf_slider.set(config.conf)
+            config.conf = max(0.01, min(1.0, val))
+            config.save()
         except Exception:
-            self._set_entry_text(self.conf_entry, f"{config.conf:.2f}")
-
-    def update_imgsz(self, val):
-        if getattr(self, "_updating_imgsz", False): return
-        self._updating_imgsz = True
-        try:
-            val = int(round(val))
-            config.imgsz = val
-            self._set_entry_text(self.imgsz_entry, str(val))
-        finally:
-            self._updating_imgsz = False
+            pass
+        self._set_entry_text(self.conf_entry, f"{config.conf:.2f}")
 
     def on_imgsz_entry_commit(self, event=None):
         try:
             val = int(self.imgsz_entry.get().strip())
-            config.imgsz = max(128, min(1920, val))
-            self.imgsz_slider.set(config.imgsz)
+            config.imgsz = max(64, min(1920, val))
+            config.save()
         except Exception:
-            self._set_entry_text(self.imgsz_entry, str(config.imgsz))
+            pass
+        self._set_entry_text(self.imgsz_entry, str(config.imgsz))
 
     def get_model_list(self):
         models = config.list_models()
@@ -1027,6 +1031,8 @@ class CapkfaPlusGUI(ctk.CTk):
             self.model_size.set(get_model_size(path))
             reload_model(path)
             self.load_class_list()
+            if hasattr(self, "imgsz_entry"):
+                self._set_entry_text(self.imgsz_entry, str(config.imgsz))
             config.save()
 
     def reload_current_model(self):
@@ -1034,6 +1040,9 @@ class CapkfaPlusGUI(ctk.CTk):
             reload_model(config.model_path)
             self.load_class_list()
             self.model_size.set(get_model_size(config.model_path))
+            if hasattr(self, "imgsz_entry"):
+                self._set_entry_text(self.imgsz_entry, str(config.imgsz))
+            config.save()
 
     def load_class_list(self):
         classes = get_model_classes()
@@ -1060,18 +1069,23 @@ class CapkfaPlusGUI(ctk.CTk):
 
     def select_player_class(self, val):
         config.custom_player_label = val
+        config.save()
 
     def select_head_class(self, val):
         config.custom_head_label = val
+        config.save()
 
     def on_trigger_enabled_toggle(self):
         config.trigger_enabled = bool(self.trigger_enabled_var.get())
+        config.save()
 
     def on_trigger_always_on_toggle(self):
         config.trigger_always_on = bool(self.trigger_always_on_var.get())
+        config.save()
 
     def update_trigger_button(self, val):
         config.trigger_button = self._mouse_str_to_idx(val)
+        config.save()
 
     def save_trigger_params(self, event=None):
         try:
@@ -1079,12 +1093,22 @@ class CapkfaPlusGUI(ctk.CTk):
             config.trigger_min_conf = float(self.tb_conf_entry.get().strip())
             config.trigger_delay_ms = int(self.tb_delay_entry.get().strip())
             config.trigger_cooldown_ms = int(self.tb_cd_entry.get().strip())
+            config.save()
         except Exception:
             pass
 
     def save_profile(self):
         self.save_trigger_params()
         self.save_rcs_params()
+        self.on_fov_entry_commit()
+        self.on_sens_entry_commit()
+        self.on_deadzone_entry_commit()
+        self.on_smoothing_entry_commit()
+        self.on_offset_entry_commit()
+        self.on_rcs_y_entry_commit()
+        self.on_rcs_x_entry_commit()
+        self.on_conf_entry_commit()
+        self.on_imgsz_entry_commit()
         config.save()
         messagebox.showinfo("CapkfaPlus", "Profile configuration saved successfully!")
 

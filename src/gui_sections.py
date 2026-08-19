@@ -57,7 +57,7 @@ class GUISections:
         # Image Size
         ctk.CTkLabel(detection_frame, text="Detection Resolution", text_color="#fff", font=("Segoe UI", 12, "bold")).grid(row=3, column=0, sticky="w", padx=6)
         self.imgsz_slider = ctk.CTkSlider(
-            detection_frame, from_=320, to=1280, number_of_steps=12, command=self.update_imgsz
+            detection_frame, from_=128, to=1280, number_of_steps=18, command=self.update_imgsz
         )
         self.imgsz_slider.grid(row=3, column=1, padx=(2,2), sticky="ew")
         self.imgsz_value = ctk.CTkLabel(detection_frame, text=str(config.imgsz), text_color="#ff5e69", width=50, font=("Segoe UI", 12, "bold"))
