@@ -303,7 +303,13 @@ class Mouse:
         with driver_lock:
             try:
                 if _click_fn is not None:
-                    _click_fn()
+                    try:
+                        _click_fn()
+                    except TypeError:
+                        try:
+                            _click_fn(1)
+                        except Exception:
+                            pass
                 elif _mouse_down_fn is not None and _mouse_up_fn is not None:
                     _mouse_down_fn(1)  # 1 = Left button
                     time.sleep(0.015)

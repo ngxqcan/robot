@@ -38,7 +38,7 @@ if os.path.isfile(REQUIREMENTS):
     subprocess.check_call([venv_python, "-m", "pip", "install", "-r", REQUIREMENTS] + TRUSTED_HOSTS)
 else:
     packages = [
-        "customtkinter", "opencv-python", "pyserial", "mss", "ultralytics==8.3.187",
+        "customtkinter", "Pillow", "opencv-python", "pyserial", "mss", "ultralytics==8.3.187",
         "onnx", "onnxruntime-directml", "cyndilib", "dxcam"
     ]
     print(f"[*] {REQUIREMENTS} not found. Installing default packages: {packages}")
