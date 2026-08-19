@@ -33,8 +33,8 @@ class CapkfaPlusGUI(ctk.CTk):
         # Responsive sizing
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        init_w = min(1180, int(screen_width * 0.85))
-        init_h = min(880, int(screen_height * 0.88))
+        init_w = min(1200, int(screen_width * 0.88))
+        init_h = min(920, int(screen_height * 0.90))
         x = (screen_width - init_w) // 2
         y = (screen_height - init_h) // 2
         
@@ -74,6 +74,11 @@ class CapkfaPlusGUI(ctk.CTk):
         self.button_mask_var = ctk.BooleanVar(value=bool(getattr(config, "button_mask", False)))
         self.always_on_var = ctk.BooleanVar(value=bool(getattr(config, "always_on_aim", False)))
         self.head_priority_var = ctk.BooleanVar(value=bool(getattr(config, "head_priority", True)))
+        
+        # Anti-Shake & RCS Variables
+        self.rcs_enabled_var = ctk.BooleanVar(value=bool(getattr(config, "rcs_enabled", False)))
+        
+        # Triggerbot Variables
         self.trigger_enabled_var = ctk.BooleanVar(value=bool(getattr(config, "trigger_enabled", False)))
         self.trigger_always_on_var = ctk.BooleanVar(value=bool(getattr(config, "trigger_always_on", False)))
         self.trigger_btn_var = ctk.IntVar(value=int(getattr(config, "trigger_button", 1)))
@@ -208,6 +213,7 @@ class CapkfaPlusGUI(ctk.CTk):
         self.build_card_driver(left_col, row); row += 1
         self.build_card_capture(left_col, row); row += 1
         self.build_card_aim_settings(left_col, row); row += 1
+        self.build_card_recoil_control(left_col, row); row += 1
         self.build_card_dynamic_mode(left_col, row); row += 1
 
         # Right Column Cards
@@ -255,7 +261,6 @@ class CapkfaPlusGUI(ctk.CTk):
         card.grid(row=row, column=0, sticky="ew", pady=(0, 12))
         card.grid_columnconfigure((0, 1, 2), weight=1)
 
-        # Header
         ctk.CTkLabel(card, text="🔌 Driver & System Controls", font=("Segoe UI", 14, "bold"), text_color=NEON_GREEN)\
             .grid(row=0, column=0, columnspan=3, padx=15, pady=(12, 10), sticky="w")
 
@@ -286,7 +291,6 @@ class CapkfaPlusGUI(ctk.CTk):
         )
         self.capture_mode_menu.grid(row=1, column=1, padx=15, pady=(0, 12), sticky="e")
 
-        # NDI options container
         self.ndi_frame = ctk.CTkFrame(card, fg_color="transparent")
         self.ndi_frame.grid_columnconfigure(1, weight=1)
         
@@ -301,13 +305,13 @@ class CapkfaPlusGUI(ctk.CTk):
 
         self._update_ndi_controls_state()
 
-    # ---------------- Card: Aim Settings ----------------
+    # ---------------- Card: Aim Settings (Anti-Shake Included) ----------------
     def build_card_aim_settings(self, parent, row):
         card = ctk.CTkFrame(parent, fg_color=BG_CARD, corner_radius=10, border_width=1, border_color=BORDER_COLOR)
         card.grid(row=row, column=0, sticky="ew", pady=(0, 12))
         card.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(card, text="🎮 Aiming & Targeting", font=("Segoe UI", 14, "bold"), text_color=NEON_GREEN)\
+        ctk.CTkLabel(card, text="🎮 Aiming & Anti-Shake Smooth", font=("Segoe UI", 14, "bold"), text_color=NEON_GREEN)\
             .grid(row=0, column=0, columnspan=3, padx=15, pady=(12, 10), sticky="w")
 
         # Aim Mode Dropdown
@@ -339,19 +343,37 @@ class CapkfaPlusGUI(ctk.CTk):
         self.sens_entry.bind("<Return>", self.on_sens_entry_commit)
         self.sens_entry.bind("<FocusOut>", self.on_sens_entry_commit)
 
-        # Player Y Offset
-        ctk.CTkLabel(card, text="Player Y-Offset (Head/Chest)", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
+        # Anti-Shake Deadzone (px)
+        ctk.CTkLabel(card, text="Anti-Shake Deadzone (px)", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
             .grid(row=4, column=0, padx=15, pady=6, sticky="w")
+        self.deadzone_slider = ctk.CTkSlider(card, from_=0.0, to=8.0, number_of_steps=80, command=self.update_deadzone)
+        self.deadzone_slider.set(getattr(config, "aim_deadzone", 2.0))
+        self.deadzone_slider.grid(row=4, column=1, padx=(5, 10), pady=6, sticky="ew")
+        self.deadzone_label = ctk.CTkLabel(card, text=f"{getattr(config, 'aim_deadzone', 2.0):.1f}", font=("Segoe UI", 12, "bold"), text_color=NEON_CYAN, width=50)
+        self.deadzone_label.grid(row=4, column=2, padx=(0, 15), pady=6)
+
+        # Anti-Shake EMA Smoothing
+        ctk.CTkLabel(card, text="Target EMA Smooth Filter", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
+            .grid(row=5, column=0, padx=15, pady=6, sticky="w")
+        self.smoothing_slider = ctk.CTkSlider(card, from_=0.0, to=0.95, number_of_steps=95, command=self.update_smoothing)
+        self.smoothing_slider.set(getattr(config, "aim_smoothing_factor", 0.60))
+        self.smoothing_slider.grid(row=5, column=1, padx=(5, 10), pady=6, sticky="ew")
+        self.smoothing_label = ctk.CTkLabel(card, text=f"{getattr(config, 'aim_smoothing_factor', 0.60):.2f}", font=("Segoe UI", 12, "bold"), text_color=NEON_CYAN, width=50)
+        self.smoothing_label.grid(row=5, column=2, padx=(0, 15), pady=6)
+
+        # Player Y Offset
+        ctk.CTkLabel(card, text="Player Y-Offset", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
+            .grid(row=6, column=0, padx=15, pady=6, sticky="w")
         self.offset_slider = ctk.CTkSlider(card, from_=-20, to=30, number_of_steps=50, command=self.update_offset)
-        self.offset_slider.grid(row=4, column=1, padx=(5, 10), pady=6, sticky="ew")
+        self.offset_slider.grid(row=6, column=1, padx=(5, 10), pady=6, sticky="ew")
         self.offset_label = ctk.CTkLabel(card, text=str(config.player_y_offset), font=("Segoe UI", 12, "bold"), text_color=NEON_CYAN, width=50)
-        self.offset_label.grid(row=4, column=2, padx=(0, 15), pady=6)
+        self.offset_label.grid(row=6, column=2, padx=(0, 15), pady=6)
 
         # Aim Activation Button
         ctk.CTkLabel(card, text="Activation Button", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
-            .grid(row=5, column=0, padx=15, pady=(6, 12), sticky="w")
+            .grid(row=7, column=0, padx=15, pady=(6, 12), sticky="w")
         btn_frame = ctk.CTkFrame(card, fg_color="transparent")
-        btn_frame.grid(row=5, column=1, columnspan=2, padx=15, pady=(6, 12), sticky="e")
+        btn_frame.grid(row=7, column=1, columnspan=2, padx=15, pady=(6, 12), sticky="e")
 
         self.btn_menu = ctk.CTkOptionMenu(
             btn_frame, values=["Left (0)", "Right (1)", "Middle (2)", "Side 4 (3)", "Side 5 (4)"],
@@ -361,6 +383,44 @@ class CapkfaPlusGUI(ctk.CTk):
 
         ctk.CTkSwitch(btn_frame, text="Always-On", variable=self.always_on_var, command=self.on_always_on_toggle, text_color=TEXT_LIGHT)\
             .pack(side="left")
+
+    # ---------------- Card: Recoil Control System (RCS) ----------------
+    def build_card_recoil_control(self, parent, row):
+        card = ctk.CTkFrame(parent, fg_color=BG_CARD, corner_radius=10, border_width=1, border_color=BORDER_COLOR)
+        card.grid(row=row, column=0, sticky="ew", pady=(0, 12))
+        card.grid_columnconfigure(1, weight=1)
+
+        # Header + Switch
+        hdr = ctk.CTkFrame(card, fg_color="transparent")
+        hdr.grid(row=0, column=0, columnspan=3, padx=15, pady=(12, 10), sticky="ew")
+        ctk.CTkLabel(hdr, text="🔫 Recoil Control System (RCS)", font=("Segoe UI", 14, "bold"), text_color=NEON_ORANGE).pack(side="left")
+        ctk.CTkSwitch(hdr, text="Enable RCS", variable=self.rcs_enabled_var, command=self.on_rcs_toggle, text_color=TEXT_LIGHT).pack(side="right")
+
+        # Vertical Recoil (Pull Down)
+        ctk.CTkLabel(card, text="Vertical Pull Strength", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
+            .grid(row=1, column=0, padx=15, pady=6, sticky="w")
+        self.rcs_y_slider = ctk.CTkSlider(card, from_=0.0, to=15.0, number_of_steps=150, command=self.update_rcs_y)
+        self.rcs_y_slider.set(getattr(config, "rcs_strength_y", 2.8))
+        self.rcs_y_slider.grid(row=1, column=1, padx=(5, 10), pady=6, sticky="ew")
+        self.rcs_y_lbl = ctk.CTkLabel(card, text=f"{getattr(config, 'rcs_strength_y', 2.8):.1f}", font=("Segoe UI", 12, "bold"), text_color=NEON_ORANGE, width=50)
+        self.rcs_y_lbl.grid(row=1, column=2, padx=(0, 15), pady=6)
+
+        # Horizontal Recoil (Compensate X)
+        ctk.CTkLabel(card, text="Horizontal Compensation", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
+            .grid(row=2, column=0, padx=15, pady=6, sticky="w")
+        self.rcs_x_slider = ctk.CTkSlider(card, from_=-5.0, to=5.0, number_of_steps=100, command=self.update_rcs_x)
+        self.rcs_x_slider.set(getattr(config, "rcs_strength_x", 0.0))
+        self.rcs_x_slider.grid(row=2, column=1, padx=(5, 10), pady=6, sticky="ew")
+        self.rcs_x_lbl = ctk.CTkLabel(card, text=f"{getattr(config, 'rcs_strength_x', 0.0):.1f}", font=("Segoe UI", 12, "bold"), text_color=NEON_ORANGE, width=50)
+        self.rcs_x_lbl.grid(row=2, column=2, padx=(0, 15), pady=6)
+
+        # RCS Activation Delay (ms)
+        ctk.CTkLabel(card, text="RCS Start Delay (ms)", font=("Segoe UI", 12), text_color=TEXT_LIGHT)\
+            .grid(row=3, column=0, padx=15, pady=(6, 12), sticky="w")
+        self.rcs_delay_entry = ctk.CTkEntry(card, width=70, justify="center")
+        self.rcs_delay_entry.insert(0, str(getattr(config, "rcs_delay_ms", 45)))
+        self.rcs_delay_entry.grid(row=3, column=1, columnspan=2, padx=15, pady=(6, 12), sticky="e")
+        self.rcs_delay_entry.bind("<FocusOut>", self.save_rcs_params)
 
     # ---------------- Card: Dynamic Mode Settings ----------------
     def build_card_dynamic_mode(self, parent, row):
@@ -421,7 +481,7 @@ class CapkfaPlusGUI(ctk.CTk):
             ctk.CTkLabel(self.dynamic_frame, text="Wind Randomness", text_color=TEXT_LIGHT).grid(row=2, column=0, padx=15, pady=(6, 12), sticky="w")
             self.smooth_wind_slider = ctk.CTkSlider(self.dynamic_frame, from_=0.0, to=15.0, command=self.update_smooth_wind)
             self.smooth_wind_slider.set(config.smooth_wind)
-            self.smooth_wind_slider.grid(row=2, column=1, padx=(5, 10), pady=(6, 12), sticky="ew")
+            self.smooth_wind_slider.grid(row=2, column=1, padx=(5, 10), pady=6, sticky="ew")
             self.smooth_wind_lbl = ctk.CTkLabel(self.dynamic_frame, text=f"{config.smooth_wind:.1f}", text_color=NEON_CYAN, width=50)
             self.smooth_wind_lbl.grid(row=2, column=2, padx=(0, 15), pady=(6, 12))
 
@@ -669,14 +729,10 @@ class CapkfaPlusGUI(ctk.CTk):
             frame = get_latest_preview_frame()
             if frame is not None:
                 try:
-                    # Get available canvas dimensions
                     target_w = max(256, self.preview_canvas_label.winfo_width() - 20)
                     target_h = max(256, self.preview_canvas_label.winfo_height() - 20)
-                    
-                    # Maintain aspect ratio (1:1 square)
                     side = min(target_w, target_h, 600)
                     
-                    # Resize with fast interpolation
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     pil_img = Image.fromarray(rgb_frame)
                     pil_img = pil_img.resize((side, side), Image.Resampling.BILINEAR)
@@ -688,7 +744,6 @@ class CapkfaPlusGUI(ctk.CTk):
             elif not is_aimbot_running():
                 self.preview_canvas_label.configure(image=None, text="[ Aimbot Stopped — Click START AIMBOT to Launch Stream ]")
 
-        # Schedule next preview frame at ~30 FPS for UI smoothness without CPU overhead
         self.after(33, self.poll_preview)
 
     # =========================================================================
@@ -701,8 +756,21 @@ class CapkfaPlusGUI(ctk.CTk):
         self.sens_slider.set(config.in_game_sens)
         self._set_entry_text(self.sens_entry, f"{config.in_game_sens:.2f}")
 
+        self.deadzone_slider.set(getattr(config, "aim_deadzone", 2.0))
+        self.deadzone_label.configure(text=f"{getattr(config, 'aim_deadzone', 2.0):.1f}")
+
+        self.smoothing_slider.set(getattr(config, "aim_smoothing_factor", 0.60))
+        self.smoothing_label.configure(text=f"{getattr(config, 'aim_smoothing_factor', 0.60):.2f}")
+
         self.offset_slider.set(config.player_y_offset)
         self.offset_label.configure(text=str(config.player_y_offset))
+
+        self.rcs_enabled_var.set(bool(getattr(config, "rcs_enabled", False)))
+        self.rcs_y_slider.set(getattr(config, "rcs_strength_y", 2.8))
+        self.rcs_y_lbl.configure(text=f"{getattr(config, 'rcs_strength_y', 2.8):.1f}")
+        self.rcs_x_slider.set(getattr(config, "rcs_strength_x", 0.0))
+        self.rcs_x_lbl.configure(text=f"{getattr(config, 'rcs_strength_x', 0.0):.1f}")
+        self._set_entry_text(self.rcs_delay_entry, str(getattr(config, "rcs_delay_ms", 45)))
 
         self.conf_slider.set(config.conf)
         self._set_entry_text(self.conf_entry, f"{config.conf:.2f}")
@@ -832,6 +900,31 @@ class CapkfaPlusGUI(ctk.CTk):
             self.sens_slider.set(config.in_game_sens)
         except Exception:
             self._set_entry_text(self.sens_entry, f"{config.in_game_sens:.2f}")
+
+    def update_deadzone(self, val):
+        config.aim_deadzone = round(float(val), 1)
+        self.deadzone_label.configure(text=f"{config.aim_deadzone:.1f}")
+
+    def update_smoothing(self, val):
+        config.aim_smoothing_factor = round(float(val), 2)
+        self.smoothing_label.configure(text=f"{config.aim_smoothing_factor:.2f}")
+
+    def on_rcs_toggle(self):
+        config.rcs_enabled = bool(self.rcs_enabled_var.get())
+
+    def update_rcs_y(self, val):
+        config.rcs_strength_y = round(float(val), 1)
+        self.rcs_y_lbl.configure(text=f"{config.rcs_strength_y:.1f}")
+
+    def update_rcs_x(self, val):
+        config.rcs_strength_x = round(float(val), 1)
+        self.rcs_x_lbl.configure(text=f"{config.rcs_strength_x:.1f}")
+
+    def save_rcs_params(self, event=None):
+        try:
+            config.rcs_delay_ms = int(self.rcs_delay_entry.get().strip())
+        except Exception:
+            pass
 
     def update_offset(self, val):
         val = int(round(val))
@@ -991,6 +1084,7 @@ class CapkfaPlusGUI(ctk.CTk):
 
     def save_profile(self):
         self.save_trigger_params()
+        self.save_rcs_params()
         config.save()
         messagebox.showinfo("CapkfaPlus", "Profile configuration saved successfully!")
 

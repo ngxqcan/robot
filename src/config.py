@@ -21,7 +21,6 @@ class MONITORINFO(ctypes.Structure):
     ]
 
 def get_foreground_monitor_resolution():
-    # DPI awareness so we get actual pixels
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
     except Exception:
@@ -32,7 +31,7 @@ def get_foreground_monitor_resolution():
 
     try:
         user32 = ctypes.windll.user32
-        monitor = user32.MonitorFromWindow(user32.GetForegroundWindow(), 2)  # MONITOR_DEFAULTTONEAREST = 2
+        monitor = user32.MonitorFromWindow(user32.GetForegroundWindow(), 2)
         mi = MONITORINFO()
         mi.cbSize = ctypes.sizeof(MONITORINFO)
 
@@ -62,6 +61,16 @@ class Config:
         self.target_lock_hysteresis = True
         self.main_pc_width = w
         self.main_pc_height = h
+
+        # --- Anti-Shaking & Deadzone Settings ---
+        self.aim_deadzone = 2.0           # Deadzone radius (px): completely prevents shaking near target
+        self.aim_smoothing_factor = 0.60  # Exponential Moving Average filter (0.0=raw, 0.9=ultra smooth)
+
+        # --- Recoil Control System (RCS) ---
+        self.rcs_enabled = False          # Enable Recoil Control
+        self.rcs_strength_y = 2.8         # Vertical recoil compensation pull strength
+        self.rcs_strength_x = 0.0         # Horizontal recoil compensation
+        self.rcs_delay_ms = 45            # Delay after firing before RCS kicks in (ms)
 
         # --- Model and Detection ---
         self.models_dir = "models"
@@ -160,7 +169,6 @@ class Config:
     # -- Profile functions --
     def save(self, path="config_profile.json"):
         data = self.__dict__.copy()
-        # Filter non-serializable fields
         filtered = {k: v for k, v in data.items() if isinstance(v, (int, float, str, bool, list, dict))}
         with open(path, "w") as f:
             json.dump(filtered, f, indent=2)

@@ -28,6 +28,11 @@ makcu = None   # Backward compatibility alias
 _last_trigger_time_ms = 0.0
 _in_zone_since_ms = 0.0
 _last_locked_target_pos = None
+_last_locked_entity = None
+_smoothed_aim_point = None
+_subpixel_carry_x = 0.0
+_subpixel_carry_y = 0.0
+_firing_start_ms = 0.0
 
 # --- Thread-Safe Preview Buffer ---
 _preview_frame_lock = threading.Lock()
@@ -133,7 +138,7 @@ def draw_corner_rect(img, pt1, pt2, color, thickness=2, corner_len=14):
     cv2.line(img, (x1, y1), (x1, y1 + cl), color, thickness, cv2.LINE_AA)
     # Top-Right
     cv2.line(img, (x2, y1), (x2 - cl, y1), color, thickness, cv2.LINE_AA)
-    cv2.line(img, (x2, y1), (x2, y1 + cl), color, thickness, cv2.LINE_AA)
+    cv2.line(img, (x2, y1), (x2 - cl, y1), color, thickness, cv2.LINE_AA)
     # Bottom-Left
     cv2.line(img, (x1, y2), (x1 + cl, y2), color, thickness, cv2.LINE_AA)
     cv2.line(img, (x1, y2), (x1, y2 - cl), color, thickness, cv2.LINE_AA)
@@ -158,7 +163,7 @@ def draw_cyber_pill(img, text, center_pt, bg_color=(10, 10, 14), border_color=(3
     y1 = max(2, y2 - th - (pad_y * 2))
 
     if is_active:
-        # Highlighted Active Target Pill (bright orange border, black background)
+        # Highlighted Active Target Pill
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 0), -1)
         cv2.rectangle(img, (x1, y1), (x2, y2), (34, 96, 255), 2, cv2.LINE_AA)
     else:
@@ -172,7 +177,6 @@ def draw_cyber_pill(img, text, center_pt, bg_color=(10, 10, 14), border_color=(3
 def group_detections_into_entities(raw_detections):
     """
     Groups raw YOLO detections into coherent Bot Entities (Head + Body pairs).
-    Returns list of entity dictionaries.
     """
     heads = [d for d in raw_detections if d['type'] == "head"]
     bodies = [d for d in raw_detections if d['type'] == "player"]
@@ -182,7 +186,6 @@ def group_detections_into_entities(raw_detections):
     used_heads = set()
     used_bodies = set()
 
-    # Match heads to their corresponding body box
     for bi, body in enumerate(bodies):
         bx1, by1, bx2, by2 = body['x1'], body['y1'], body['x2'], body['y2']
         bw = bx2 - bx1
@@ -198,7 +201,6 @@ def group_detections_into_entities(raw_detections):
             hcx = (hx1 + hx2) / 2.0
             hcy = (hy1 + hy2) / 2.0
 
-            # Check if head is vertically near top of body and horizontally aligned
             if (bx1 - bw * 0.4) <= hcx <= (bx2 + bw * 0.4) and (by1 - bh * 0.5) <= hcy <= (by1 + bh * 0.6):
                 d = abs(hcx - (bx1 + bx2) / 2.0) + abs(hcy - by1)
                 if d < min_dist_to_body_top:
@@ -240,7 +242,6 @@ def group_detections_into_entities(raw_detections):
                 'cls_head': None
             })
 
-    # Unpaired heads
     for hi, head in enumerate(heads):
         if hi not in used_heads:
             entities.append({
@@ -258,7 +259,6 @@ def group_detections_into_entities(raw_detections):
                 'cls_head': head['cls']
             })
 
-    # Other detections
     for other in others:
         entities.append({
             'has_head': False,
@@ -279,8 +279,11 @@ def group_detections_into_entities(raw_detections):
 
 
 def detection_and_aim_loop():
-    """CONSUMER: High-performance GPU inference, target tracking, and Cyber HUD renderer."""
-    global _aimbot_running, fps, driver, makcu, _last_locked_target_pos
+    """CONSUMER: High-performance GPU inference, anti-shaking targeting, and recoil control."""
+    global _aimbot_running, fps, driver, makcu
+    global _last_locked_target_pos, _last_locked_entity, _smoothed_aim_point
+    global _subpixel_carry_x, _subpixel_carry_y, _firing_start_ms
+
     model, class_names = load_model(config.model_path)
     active_driver = driver or makcu
 
@@ -346,14 +349,11 @@ def detection_and_aim_loop():
                     class_name_str = str(class_name).lower()
                     cls_str = str(cls)
 
-                    # Check head match
                     if head_label and (head_label == class_name_str or head_label == cls_str or (len(head_label) > 1 and head_label in class_name_str)):
                         is_head = True
-                    # Check player match
                     elif player_label and (player_label == class_name_str or player_label == cls_str or (len(player_label) > 1 and player_label in class_name_str)):
                         is_player = True
                     else:
-                        # Auto default: if 0 and 1 exist, 1 is head, 0 is player
                         if cls == 1 or "head" in class_name_str:
                             is_head = True
                         elif cls == 0 or "player" in class_name_str or "enemy" in class_name_str or "bot" in class_name_str:
@@ -372,7 +372,7 @@ def detection_and_aim_loop():
         # Group raw detections into Bot Entities
         entities = group_detections_into_entities(raw_detections)
 
-        # Calculate Aim Point and Distance from Crosshair for each entity
+        # Calculate Aim Point and Distance from Crosshair
         valid_aim_targets = []
         for ent in entities:
             aim_x = None
@@ -397,13 +397,12 @@ def detection_and_aim_loop():
                 ent['dist'] = dist
                 ent['target_conf'] = target_conf
 
-                # Filter by FOV circle
                 if dist <= fov_radius:
                     valid_aim_targets.append(ent)
             else:
                 ent['dist'] = float('inf')
 
-        # Target Selection: Closest to Crosshair
+        # Target Selection: Closest to Crosshair with Hysteresis
         best_target = None
         if valid_aim_targets:
             if config.target_lock_hysteresis and _last_locked_target_pos is not None:
@@ -421,32 +420,112 @@ def detection_and_aim_loop():
         else:
             _last_locked_target_pos = None
 
+        # --- Anti-Shaking EMA Filter ---
+        if best_target is not None:
+            raw_tx, raw_ty = best_target['aim_x'], best_target['aim_y']
+            if _smoothed_aim_point is None or _last_locked_entity is not best_target:
+                _smoothed_aim_point = (raw_tx, raw_ty)
+            else:
+                # Exponential Moving Average (EMA) smoothing to eliminate bounding box flicker
+                smooth_factor = getattr(config, "aim_smoothing_factor", 0.60)
+                alpha = max(0.15, min(1.0, 1.0 - (smooth_factor * 0.65)))
+                sx = _smoothed_aim_point[0] * (1.0 - alpha) + raw_tx * alpha
+                sy = _smoothed_aim_point[1] * (1.0 - alpha) + raw_ty * alpha
+                _smoothed_aim_point = (sx, sy)
+            _last_locked_entity = best_target
+        else:
+            _smoothed_aim_point = None
+            _last_locked_entity = None
+
+        # --- Recoil Control Calculation (RCS) ---
+        now_ms = _now_ms()
+        is_firing = is_button_pressed(0)  # Left Mouse Button / Shooting Key
+        rcs_offset_x = 0.0
+        rcs_offset_y = 0.0
+
+        if getattr(config, "rcs_enabled", False):
+            if is_firing:
+                if _firing_start_ms == 0.0:
+                    _firing_start_ms = now_ms
+                
+                # Check if firing duration exceeded RCS activation delay
+                rcs_delay = getattr(config, "rcs_delay_ms", 45)
+                if (now_ms - _firing_start_ms) >= rcs_delay:
+                    rcs_offset_y = float(getattr(config, "rcs_strength_y", 2.8))
+                    rcs_offset_x = float(getattr(config, "rcs_strength_x", 0.0))
+            else:
+                _firing_start_ms = 0.0
+        else:
+            _firing_start_ms = 0.0
+
         # --- Mouse Aim Execution ---
         button_held = is_button_pressed(config.selected_mouse_button)
-        should_aim = (button_held or config.always_on_aim) and (best_target is not None) and (active_driver is not None)
+        should_aim = (button_held or config.always_on_aim) and (_smoothed_aim_point is not None) and (active_driver is not None)
 
-        if should_aim and best_target:
-            target_screen_x = region_left + best_target['aim_x']
-            target_screen_y = region_top + best_target['aim_y']
+        if should_aim and _smoothed_aim_point is not None:
+            aim_px, aim_py = _smoothed_aim_point
+            target_screen_x = region_left + aim_px
+            target_screen_y = region_top + aim_py
 
-            dx = target_screen_x - crosshair_x
-            dy = target_screen_y - crosshair_y
+            raw_dx = target_screen_x - crosshair_x
+            raw_dy = target_screen_y - crosshair_y
 
-            # Sensitivity scaling
-            sens = config.in_game_sens
-            distance = 1.07437623 * math.pow(sens, -0.9936827126)
-            dx *= distance
-            dy *= distance
+            # --- Anti-Shaking Deadzone & Progressive Damping ---
+            dist_to_crosshair = math.hypot(raw_dx, raw_dy)
+            deadzone = float(getattr(config, "aim_deadzone", 2.0))
+
+            if dist_to_crosshair <= deadzone:
+                # Inside deadzone: no aim movement to guarantee zero shaking!
+                dx = 0.0
+                dy = 0.0
+            else:
+                # Progressive Damping for close ranges (smooth glide into deadzone without oscillation)
+                damping = 1.0
+                if dist_to_crosshair < 14.0:
+                    damping = (dist_to_crosshair - deadzone) / max(0.5, 14.0 - deadzone)
+                
+                dx = raw_dx * damping
+                dy = raw_dy * damping
+
+                # Sensitivity scaling
+                sens = config.in_game_sens
+                sens_multiplier = 1.07437623 * math.pow(sens, -0.9936827126)
+                dx *= sens_multiplier
+                dy *= sens_multiplier
+
+            # Add RCS recoil compensation to Y axis
+            dy += rcs_offset_y
+            dx += rcs_offset_x
+
+            # Subpixel accumulation for ultra smooth stepping
+            dx += _subpixel_carry_x
+            dy += _subpixel_carry_y
 
             if config.mode == "normal":
                 dx *= config.normal_x_speed
                 dy *= config.normal_y_speed
-                active_driver.move(dx, dy)
+                
+                step_x = int(round(dx))
+                step_y = int(round(dy))
+                _subpixel_carry_x = dx - step_x
+                _subpixel_carry_y = dy - step_y
+
+                if step_x != 0 or step_y != 0:
+                    active_driver.move(step_x, step_y)
+
             elif config.mode == "bezier":
+                _subpixel_carry_x = 0.0
+                _subpixel_carry_y = 0.0
                 active_driver.move_bezier(dx, dy, config.bezier_segments, config.bezier_ctrl_x, config.bezier_ctrl_y)
+
             elif config.mode == "silent":
+                _subpixel_carry_x = 0.0
+                _subpixel_carry_y = 0.0
                 active_driver.move_bezier(dx, dy, config.silent_segments, config.silent_ctrl_x, config.silent_ctrl_y)
+
             elif config.mode == "smooth":
+                _subpixel_carry_x = 0.0
+                _subpixel_carry_y = 0.0
                 path = smooth_aimer.calculate_smooth_path(dx, dy, config)
                 for move_dx, move_dy, delay in path:
                     if not smooth_move_queue.full():
@@ -459,10 +538,19 @@ def detection_and_aim_loop():
                             pass
                         smooth_move_queue.put((move_dx, move_dy, delay))
                         break
-                if len(path) == 0:
-                    active_driver.move(dx, dy)
+                if len(path) == 0 and (dx != 0 or dy != 0):
+                    active_driver.move(int(round(dx)), int(round(dy)))
+
+        elif getattr(config, "rcs_enabled", False) and is_firing and active_driver is not None and (rcs_offset_y != 0 or rcs_offset_x != 0):
+            # Standalone Recoil Control when spraying without target lock
+            active_driver.move(int(round(rcs_offset_x)), int(round(rcs_offset_y)))
+            smooth_aimer.reset_fatigue()
+            _subpixel_carry_x = 0.0
+            _subpixel_carry_y = 0.0
         else:
             smooth_aimer.reset_fatigue()
+            _subpixel_carry_x = 0.0
+            _subpixel_carry_y = 0.0
 
         # --- Fast Triggerbot Logic ---
         try:
@@ -544,7 +632,6 @@ def detection_and_aim_loop():
 
             # 2. Draw Center Crosshair: Cyan Circle with Center Dot
             if getattr(config, "preview_fov", True):
-                # Hollow Cyan Circle at center (Radius 12px)
                 cv2.circle(hud_img, (cx, cy), 12, (255, 229, 0), 2, cv2.LINE_AA)
                 cv2.circle(hud_img, (cx, cy), 2, (255, 229, 0), -1, cv2.LINE_AA)
 
