@@ -50,13 +50,16 @@ w, h = get_foreground_monitor_resolution()
 class Config:
     def __init__(self):
         # --- General Settings (1PC) ---
-        self.region_size = 200
+        self.region_size = 256
         w, h = get_foreground_monitor_resolution()
         self.screen_width = w
         self.screen_height = h
         self.player_y_offset = 5  # Offset for player detection
         self.capturer_mode = "DXGI"  # Default to DXGI mode for high-performance 1PC capture
+        self.target_fps = 240
         self.always_on_aim = False
+        self.head_priority = True
+        self.target_lock_hysteresis = True
         self.main_pc_width = w
         self.main_pc_height = h
 
@@ -67,12 +70,12 @@ class Config:
         self.custom_head_label = "Select a Head Class"  
         self.model_file_size = 0
         self.model_load_error = ""
-        self.conf = 0.2
+        self.conf = 0.25
         self.imgsz = 640
         self.max_detect = 50
         
         # --- Mouse / Logitech Driver ---
-        self.selected_mouse_button = 3   # Default to side/middle mouse button
+        self.selected_mouse_button = 3   # Default to side/middle mouse button (3: Side 4)
         self.logitech_connected = False
         self.logitech_status_msg = "Disconnected"
         self.makcu_connected = False  # Compatibility alias
@@ -82,14 +85,13 @@ class Config:
         self.button_mask = False  # Button masking toggle
 
         # --- Trigger Settings ---
-        self.trigger_enabled         = getattr(self, "trigger_enabled", False)   # master on/off
-        self.trigger_always_on       = getattr(self, "trigger_always_on", False) # fire even without holding key
-        self.trigger_button          = getattr(self, "trigger_button", 1)        # 0..4 -> Left, Right, Middle, Side4, Side5
-
-        self.trigger_radius_px       = getattr(self, "trigger_radius_px", 8)     # how close to crosshair (px)
-        self.trigger_delay_ms        = getattr(self, "trigger_delay_ms", 30)     # delay before click
-        self.trigger_cooldown_ms     = getattr(self, "trigger_cooldown_ms", 120) # time between clicks
-        self.trigger_min_conf        = getattr(self, "trigger_min_conf", 0.35)   # min conf to shoot
+        self.trigger_enabled         = False
+        self.trigger_always_on       = False
+        self.trigger_button          = 1        # 0: Left, 1: Right, 2: Middle, 3: Side4, 4: Side5
+        self.trigger_radius_px       = 10       # how close to crosshair (px)
+        self.trigger_delay_ms        = 25       # delay before click
+        self.trigger_cooldown_ms     = 120      # time between clicks
+        self.trigger_min_conf        = 0.35     # min conf to shoot
 
         # --- Aimbot Mode ---
         self.mode = "normal"    
@@ -97,8 +99,8 @@ class Config:
         self.aimbot_status_msg = "Stopped"
 
         # --- Normal Aim ---
-        self.normal_x_speed = 0.5
-        self.normal_y_speed = 0.5
+        self.normal_x_speed = 0.55
+        self.normal_y_speed = 0.55
 
         # --- Bezier Aim ---
         self.bezier_segments = 8
@@ -134,12 +136,20 @@ class Config:
         self.smooth_fatigue_effect = 1.2   # How much fatigue affects shakiness
         self.smooth_micro_corrections = 0  # Small random corrections (pixels)
 
-        # --- Last error/status for GUI display
+        # --- Preview & HUD Overlays ---
+        self.show_preview = True
+        self.preview_fov = True
+        self.preview_boxes = True
+        self.preview_vectors = True
+        self.show_debug_window = False
+
+        # --- Real-Time Telemetry ---
+        self.capture_fps = 0.0
+        self.detection_latency = 0.0
+
+        # --- Last error/status for GUI display ---
         self.last_error = ""
         self.last_info = ""
-
-        # --- Debug window toggle ---
-        self.show_debug_window = False
 
         # --- NDI Settings (Legacy/Optional) ---
         self.ndi_width = 0
@@ -150,8 +160,10 @@ class Config:
     # -- Profile functions --
     def save(self, path="config_profile.json"):
         data = self.__dict__.copy()
+        # Filter non-serializable fields
+        filtered = {k: v for k, v in data.items() if isinstance(v, (int, float, str, bool, list, dict))}
         with open(path, "w") as f:
-            json.dump(data, f, indent=2)
+            json.dump(filtered, f, indent=2)
 
     def load(self, path="config_profile.json"):
         if os.path.exists(path):
